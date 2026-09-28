@@ -3,10 +3,10 @@ const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icon.png'
+  './icon-192.png',
+  './icon-512.png'
 ];
 
-// Instalacja i zapisanie plików do pamięci cache
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
@@ -15,7 +15,6 @@ self.addEventListener('install', event => {
   );
 });
 
-// Serwowanie plików z pamięci cache przy braku internetu
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(response => {

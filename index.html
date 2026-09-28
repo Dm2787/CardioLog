@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="pl" id="htmlTag">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CardioLog</title>
+<!-- Skrypty wykresów i adnotacji -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+<!-- Czcionka -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --bg-main: #0f111a; --bg-card: #1e212b; --bg-input: #2a2d3d;
+        --text-main: #ffffff; --text-muted: #9ca3af;
+        --primary: #3b82f6; --primary-hover: #2563eb;
+        --danger: #ef4444; --border: #2d3142;
+        --radius-lg: 20px; --radius-md: 14px; --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    body.light-mode {
+        --bg-main: #f3f4f6; --bg-card: #ffffff; --bg-input: #f9fafb;
+        --text-main: #111827; --text-muted: #6b7280;
+        --primary: #2563eb; --border: #e5e7eb; --shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    button:focus, input:focus, select:focus, textarea:focus { outline: none; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg-main); color: var(--text-main); margin: 0; padding: 15px; transition: background 0.3s, color 0.3s; }
+    
+    .top-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-top: 5px; }
+    .hamburger-btn { background: transparent; border: none; color: var(--text-main); cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; }
+    .app-title { display: flex; align-items: center; gap: 8px; }
+    .app-title h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; color: var(--text-main); }
+    .heart-icon { color: var(--danger); animation: heartbeat 2s infinite; display: flex; align-items: center; }
+    .heart-icon svg { width: 24px; height: 24px; fill: currentColor; }
+    @keyframes heartbeat { 0%, 20%, 40%, 100% { transform: scale(1); } 10%, 30% { transform: scale(1.15); } }
+
+    .profile-bar { margin-bottom: 25px; position: relative; z-index: 10; display: flex; gap: 10px; }
+    .profile-selector { flex: 1; background: var(--bg-card); padding: 14px 18px; border-radius: var(--radius-lg); display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid var(--border); font-weight: 600; box-shadow: var(--shadow); transition: transform 0.2s; }
+    .profile-selector:active { transform: scale(0.98); }
+    .profile-menu { display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-top: 8px; overflow: hidden; box-shadow: var(--shadow); }
+    .profile-menu.open { display: block; animation: slideDown 0.2s ease-out; }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .profile-item { padding: 14px 18px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+    .profile-item:last-child { border-bottom: none; }
+    .profile-item.active-profile { color: var(--primary); font-weight: 700; }
+    .profile-add-btn { color: #10b981; font-weight: 600; justify-content: center; }
+
+    .view-toggle { display: flex; background: var(--bg-card); padding: 6px; border-radius: var(--radius-lg); margin-bottom: 20px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+    .view-toggle button { flex: 1; padding: 12px; background: transparent; border: none; color: var(--text-muted); border-radius: var(--radius-md); cursor: pointer; font-weight: 600; transition: all 0.3s; font-size: 14px; }
+    .view-toggle button.active { background: var(--primary); color: #fff; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); }
+
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .calendar-header button { padding: 10px 18px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-main); border-radius: var(--radius-md); cursor: pointer; font-weight: bold; box-shadow: var(--shadow); }
+    .calendar-header h3 { margin: 0; font-size: 18px; font-weight: 700; }
+
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .day-names { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 10px; text-align: center; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+    .month-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 25px; }
+    .day { background: var(--bg-card); border-radius: var(--radius-md); padding: 14px 0; text-align: center; cursor: pointer; border: 1px solid var(--border); box-shadow: var(--shadow); font-weight: 500; transition: transform 0.2s; }
+    .day:active { transform: scale(0.95); }
+    .dots { display: flex; justify-content: center; gap: 5px; margin-top: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #444; }
+
+    .week-view { display: none; flex-direction: column; gap: 15px; margin-bottom: 25px; }
+    .week-day { background: transparent; }
+    .week-day-header { font-weight: 700; margin-bottom: 12px; color: var(--text-muted); font-size: 13px; text-transform: uppercase; padding-left: 5px; }
+    
+    .measurement { background: var(--bg-card); padding: 16px; border-radius: var(--radius-lg); margin-bottom: 10px; display: flex; flex-direction: column; cursor: pointer; border: 1px solid var(--border); border-left-width: 8px; box-shadow: var(--shadow); transition: transform 0.2s; position: relative; overflow: hidden; }
+    .measurement:active { transform: scale(0.98); }
+    .measurement.empty { border-left-width: 1px; text-align: center; align-items: center; justify-content: center; font-style: italic; color: var(--text-muted); padding: 20px; }
+    
+    .meas-info { display: flex; flex-direction: column; gap: 4px; padding-left: 5px; }
+    .meas-title { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+    .meas-values { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+    .meas-values small { font-size: 13px; font-weight: 500; opacity: 0.8; margin-left: 8px; }
+    .meas-extra { font-size: 13px; color: var(--text-muted); margin-top: 6px; padding-left: 5px; font-weight: 500; line-height: 2.2; }
+    .meas-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-left: 5px; }
+    .meas-tag { background: var(--bg-input); border: 1px solid var(--border); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .meas-note { font-size: 13px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); padding-left: 5px; font-style: italic; opacity: 0.9; }
+
+    /* Kolory Kategoryzacji WHO */
+    .dot.normal, .color-box.normal { background: #10b981 !important; }
+    .dot.high-normal, .color-box.high-normal { background: #84cc16 !important; }
+    .dot.mild, .color-box.mild { background: #facc15 !important; }
+    .dot.moderate, .color-box.moderate { background: #f97316 !important; }
+    .dot.severe, .color-box.severe { background: #ef4444 !important; }
+    .dot.low, .color-box.low { background: #38bdf8 !important; }
+
+    .measurement.normal { background: #10b981; border-color: #059669; border-left-color: #047857; color: #000 !important; }
+    .measurement.high-normal { background: #84cc16; border-color: #65a30d; border-left-color: #4d7c0f; color: #000 !important; }
+    .measurement.mild { background: #facc15; border-color: #eab308; border-left-color: #a16207; color: #000 !important; }
+    .measurement.moderate { background: #f97316; border-color: #ea580c; border-left-color: #c2410c; color: #000 !important; }
+    .measurement.severe { background: #ef4444; border-color: #dc2626; border-left-color: #b91c1c; color: #fff !important; }
+    .measurement.low { background: #38bdf8; border-color: #0ea5e9; border-left-color: #0284c7; color: #082f49 !important; }
+
+    .measurement.normal .meas-title, .measurement.normal .meas-extra, .measurement.normal .meas-note,
+    .measurement.high-normal .meas-title, .measurement.high-normal .meas-extra, .measurement.high-normal .meas-note,
+    .measurement.mild .meas-title, .measurement.mild .meas-extra, .measurement.mild .meas-note,
+    .measurement.moderate .meas-title, .measurement.moderate .meas-extra, .measurement.moderate .meas-note,
+    .measurement.low .meas-title, .measurement.low .meas-extra, .measurement.low .meas-note { color: rgba(0,0,0,0.7); border-top-color: rgba(0,0,0,0.15); }
+    .measurement.normal .meas-tag, .measurement.high-normal .meas-tag, .measurement.mild .meas-tag, .measurement.moderate .meas-tag, .measurement.low .meas-tag { background: rgba(255,255,255,0.3); border-color: rgba(0,0,0,0.15); color: #000; }
+    
+    .measurement.severe .meas-title, .measurement.severe .meas-extra, .measurement.severe .meas-note { color: rgba(255,255,255,0.85); border-top-color: rgba(255,255,255,0.2); }
+    .measurement.severe .meas-tag { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.2); color: #fff; }
+
+    body.light-mode .measurement { background: var(--bg-card); border-color: var(--border); border-left-color: #cbd5e1; }
+    body.light-mode .measurement.normal { background: #ecfdf5; border-color: #d1fae5; border-left-color: #10b981; color: #065f46 !important; }
+    body.light-mode .measurement.high-normal { background: #f7fee7; border-color: #ecfccb; border-left-color: #84cc16; color: #3f6212 !important; }
+    body.light-mode .measurement.mild { background: #fefce8; border-color: #fef08a; border-left-color: #facc15; color: #854d0e !important; }
+    body.light-mode .measurement.moderate { background: #fff7ed; border-color: #ffedd5; border-left-color: #f97316; color: #9a3412 !important; }
+    body.light-mode .measurement.severe { background: #fef2f2; border-color: #fee2e2; border-left-color: #ef4444; color: #991b1b !important; }
+    body.light-mode .measurement.low { background: #e0f2fe; border-color: #bae6fd; border-left-color: #0ea5e9; color: #075985 !important; }
+
+    body.light-mode .measurement.normal .meas-title, body.light-mode .measurement.normal .meas-extra, body.light-mode .measurement.normal .meas-note { color: #047857; border-top-color: rgba(16, 185, 129, 0.2); }
+    body.light-mode .measurement.high-normal .meas-title, body.light-mode .measurement.high-normal .meas-extra, body.light-mode .measurement.high-normal .meas-note { color: #4d7c0f; border-top-color: rgba(132, 204, 22, 0.2); }
+    body.light-mode .measurement.mild .meas-title, body.light-mode .measurement.mild .meas-extra, body.light-mode .measurement.mild .meas-note { color: #a16207; border-top-color: rgba(250, 204, 21, 0.2); }
+    body.light-mode .measurement.moderate .meas-title, body.light-mode .measurement.moderate .meas-extra, body.light-mode .measurement.moderate .meas-note { color: #c2410c; border-top-color: rgba(249, 115, 22, 0.2); }
+    body.light-mode .measurement.severe .meas-title, body.light-mode .measurement.severe .meas-extra, body.light-mode .measurement.severe .meas-note { color: #b91c1c; border-top-color: rgba(239, 68, 68, 0.2); }
+    body.light-mode .measurement.low .meas-title, body.light-mode .measurement.low .meas-extra, body.light-mode .measurement.low .meas-note { color: #0369a1; border-top-color: rgba(14, 165, 233, 0.2); }
+
+    body.light-mode .measurement.normal .meas-tag { background: #d1fae5; border-color: #a7f3d0; color: #047857; }
+    body.light-mode .measurement.high-normal .meas-tag { background: #ecfccb; border-color: #d9f99d; color: #4d7c0f; }
+    body.light-mode .measurement.mild .meas-tag { background: #fef08a; border-color: #fde047; color: #a16207; }
+    body.light-mode .measurement.moderate .meas-tag { background: #ffedd5; border-color: #fdba74; color: #c2410c; }
+    body.light-mode .measurement.severe .meas-tag { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+    body.light-mode .measurement.low .meas-tag { background: #bae6fd; border-color: #7dd3fc; color: #0369a1; }
+
+    .badge { padding: 3px 8px; border-radius: 8px; font-weight: 800; font-size: 11px; color: #ffffff !important; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.1); text-shadow: 0 1px 1px rgba(0,0,0,0.2); margin: 0 2px; }
+    .badge-normal { background: #10b981 !important; }
+    .badge-warning { background: #f59e0b !important; }
+    .badge-danger { background: #ef4444 !important; }
+
+    .chart-box { background: var(--bg-card); padding: 15px 10px; border-radius: var(--radius-lg); margin-bottom: 15px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+    .chart-scroll-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 10px; }
+    .chart-scroll-container::-webkit-scrollbar { height: 6px; }
+    .chart-scroll-container::-webkit-scrollbar-track { background: transparent; }
+    .chart-scroll-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+    body.light-mode .chart-scroll-container::-webkit-scrollbar-thumb { background: #cbd5e1; }
+    .chart-wrapper { height: 320px; width: 100%; }
+    
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+    .stat-card { background: var(--bg-card); padding: 18px; border-radius: var(--radius-lg); box-shadow: var(--shadow); border: 1px solid var(--border); }
+    .stat-card h4 { margin: 0 0 12px 0; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; text-align: center; }
+    .stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    .stat-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .stat-label { color: var(--text-muted); font-weight: 500; }
+    .stat-val { font-weight: 700; }
+
+    .legend { background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); margin-bottom: 25px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+    .legend-item { display: flex; align-items: center; margin-bottom: 10px; font-size: 13px; font-weight: 500; color: var(--text-main); }
+    .color-box { width: 16px; height: 16px; border-radius: 6px; margin-right: 12px; flex-shrink: 0; }
+    .legend-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 15px; line-height: 1.5; font-style: italic; }
+
+    .menu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); z-index: 240; opacity: 0; transition: opacity 0.3s ease; }
+    .side-menu { position: fixed; top: 0; left: -320px; width: 300px; height: 100%; background: var(--bg-card); z-index: 250; transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow-y: auto; padding: 25px 20px; box-shadow: 5px 0 25px rgba(0,0,0,0.5); }
+    .side-menu.open { left: 0; }
+    .side-menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+    .side-menu-header h2 { margin: 0; font-size: 22px; font-weight: 800; color: var(--text-main); }
+    
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); align-items: center; justify-content: center; z-index: 300; opacity: 0; transition: opacity 0.3s; }
+    .modal.show { opacity: 1; }
+    .modal-content { background: var(--bg-card); padding: 25px; border-radius: 24px; width: 90%; max-width: 400px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); border: 1px solid var(--border); transform: translateY(20px); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .modal.show .modal-content { transform: translateY(0); }
+    
+    input, select, textarea { width: 100%; padding: 14px; margin-bottom: 15px; box-sizing: border-box; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 500; transition: border-color 0.2s, box-shadow 0.2s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+    label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+    
+    .modal-btn { width: 100%; padding: 15px; background: var(--primary); border: none; color: #fff; font-weight: 700; border-radius: 14px; margin-top: 5px; cursor: pointer; font-size: 15px; transition: transform 0.2s, background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .modal-btn:active { transform: scale(0.98); }
+    .btn-close { background: var(--bg-input); color: var(--text-main) !important; border: 1px solid var(--border); }
+    .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger) !important; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .btn-export-pdf { background: #10b981; }
+    
+    .tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .tag-btn { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .tag-btn.selected { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .tag-btn-add { background: transparent; border: 1px dashed var(--text-muted); color: var(--text-muted); }
+
+    .toast { position: fixed; bottom: -60px; left: 50%; transform: translateX(-50%); background: var(--danger); color: white; padding: 14px 28px; border-radius: 30px; z-index: 400; font-weight: 700; opacity: 0; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 10px 25px rgba(0,0,0,0.3); text-align:center; font-size: 14px; }
+    .toast.show { bottom: 30px; opacity: 1; }
+
+    .confirm-modal, .alert-modal, .input-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; z-index: 350; }
+    .confirm-content { background: var(--bg-card); padding: 30px 25px; border-radius: 24px; width: 85%; max-width: 340px; text-align: center; border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+    .confirm-buttons { display: flex; gap: 12px; margin-top: 25px; }
+    .confirm-buttons .modal-btn { margin-top: 0; }
+
+    .alert-content { background: var(--bg-card); padding: 30px 25px; border-radius: 24px; width: 85%; max-width: 340px; text-align: center; border: 2px solid var(--danger); box-shadow: 0 15px 35px rgba(239,68,68,0.3); }
+    .alert-icon { color: var(--danger); margin-bottom: 15px; display: flex; justify-content: center; }
+    
+    #printArea { display: none; }
+    
+    /* Tryb Jasny */
+    body.light-mode { background: #f0f2f5; color: #121212; }
+    body.light-mode .hamburger-btn, body.light-mode .app-header h1 { color: #121212; }
+    body.light-mode .profile-selector, body.light-mode .profile-menu, body.light-mode .week-day, body.light-mode .stat-card, body.light-mode .legend, body.light-mode .modal-content, body.light-mode .confirm-content { background: #ffffff; color: #121212; border-color: #ddd; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    body.light-mode .side-menu { background: #ffffff; box-shadow: 2px 0 15px rgba(0,0,0,0.1); color: #121212; }
+    body.light-mode .side-menu-header { border-bottom-color: #eee; }
+    body.light-mode .side-menu-header h2 { color: #121212; }
+    body.light-mode .close-menu-btn { color: #888; }
+    body.light-mode input, body.light-mode select, body.light-mode textarea { background: #f9f9f9; color: #121212; border: 1px solid #ccc; }
+    body.light-mode .day { background: #ffffff; border: 1px solid #eee; }
+    body.light-mode .view-toggle button, body.light-mode .calendar-header button { background: #e0e0e0; color: #333; border: 1px solid #ccc; }
+    body.light-mode .view-toggle button.active { background: #007bff; color: #fff; border-color: #007bff; }
+    body.light-mode .tag-btn { background: #e0e0e0; color: #333; border-color: #ccc; }
+    body.light-mode .tag-btn.selected { background: #007bff; color: #fff; border-color: #007bff; }
+    body.light-mode .stat-row, body.light-mode .week-day-header, body.light-mode .profile-item { border-bottom: 1px solid #eee; color: #555; }
+    body.light-mode .stat-card h4 { color: #666; }
+    body.light-mode .chart-box { background: #ffffff; border-color: #ddd; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    
+    @media print {
+        body > *:not(#printArea) { display: none !important; }
+        body { background: white !important; color: black !important; padding: 0 !important; margin: 0 !important; }
+        #printArea { display: block !important; width: 100%; }
+        .print-title { text-align: center; font-size: 24px; font-weight: 800; margin-bottom: 5px; font-family: 'Inter', sans-serif; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .print-subtitle { text-align: center; font-size: 14px; color: #333; margin-bottom: 25px; margin-top: 10px; font-family: 'Inter', sans-serif; }
+        .print-table { width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; font-size: 12px; }
+        .print-table th, .print-table td { border: 1px solid #000; padding: 8px; text-align: center; }
+        .print-table th { background-color: #eee; font-weight: 700; }
+        .print-sysdia { font-weight: 800; font-size: 14px; }
+        .print-notes { text-align: left !important; font-size: 11px; color: #222; }
+    }
+</style>
+</head>
+<body>
+
+<!-- GŁÓWNY NAGŁÓWEK -->
+<div class="top-header">
+    <button class="hamburger-btn" onclick="toggleMenu(true)">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+    </button>
+    <div class="app-title">
+        <span class="heart-icon">
+           <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        </span>
+        <h1>CardioLog</h1>
+    </div>
+    <div style="width: 28px;"></div>
+</div>
+
+<!-- PASEK PROFILI -->
+<div class="profile-bar">
+    <div class="profile-selector" onclick="toggleProfileMenu()">
+        <span id="currentProfileLabel">Profil: Damian</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+    </div>
+    <div class="profile-menu" id="profileMenu"></div>
+</div>
+
+<!-- ZAKŁADKI -->
+<div class="view-toggle">
+    <button id="btnMonth" class="active" onclick="switchMode('month')" data-i18n="tabMonth">Miesiąc</button>
+    <button id="btnWeek" onclick="switchMode('week')" data-i18n="tabWeek">Tydzień</button>
+    <button id="btnChart" onclick="switchMode('chart')" data-i18n="tabChart">Wykres</button>
+</div>
+
+<div class="calendar-header">
+    <button onclick="navDate(-1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+    <h3 id="dateLabel"></h3>
+    <button onclick="navDate(1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+</div>
+
+<!-- KONTENERY WIDOKÓW -->
+<div id="viewContainer" class="fade-in">
+    <div id="monthContainer">
+        <div class="day-names" id="calendarDaysHeader"></div>
+        <div class="month-view" id="monthGrid"></div>
+    </div>
+
+    <div class="week-view" id="weekGrid"></div>
+
+    <div class="chart-container" id="chartContainer">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4 data-i18n="stat7">Ostatnie 7 dni</h4>
+                <div class="stat-row"><span class="stat-label" data-i18n="morning">Rano:</span> <span class="stat-val" id="avg7Am">- / -</span></div>
+                <div class="stat-row"><span class="stat-label" data-i18n="evening">Wieczór:</span> <span class="stat-val" id="avg7Pm">- / -</span></div>
+                <div class="stat-row"><span class="stat-label" data-i18n="statPP">Ciśnienie Tętna (PP):</span> <span class="stat-val" id="avg7Pp">-</span></div>
+                <div class="stat-row"><span class="stat-label" data-i18n="statMAP">Średnie Tętnicze (MAP):</span> <span class="stat-val" id="avg7Map">-</span></div>
+            </div>
+            <div class="stat-card">
+                <h4 data-i18n="stat30">Ostatnie 30 dni</h4>
+                <div class="stat-row"><span class="stat-label" data-i18n="morning">Rano:</span> <span class="stat-val" id="avg30Am">- / -</span></div>
+                <div class="stat-row"><span class="stat-label" data-i18n="evening">Wieczór:</span> <span class="stat-val" id="avg30Pm">- / -</span></div>
+                <div class="stat-row"><span class="stat-label" data-i18n="statPP">Ciśnienie Tętna (PP):</span> <span class="stat-val" id="avg30Pp">-</span></div>
+                <div class="stat-row"><span class="stat-label" data-i18n="statMAP">Średnie Tętnicze (MAP):</span> <span class="stat-val" id="avg30Map">-</span></div>
+            </div>
+        </div>
+        
+        <!-- WYKRES Z SCROLLEM -->
+        <div class="chart-box">
+            <div class="chart-scroll-container" id="chartScroll">
+                <div class="chart-wrapper" id="chartWrapper">
+                    <canvas id="bpChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ASYSTENT KARDIOLOGICZNY -->
+        <div class="legend" id="insightsBox" style="display:none;"></div>
+    </div>
+</div>
+
+<div class="legend" id="legendBox">
+    <h4 style="margin-top:0; margin-bottom:5px; font-size:14px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;" data-i18n="legendTitle">Ciśnienie tętnicze (WHO)</h4>
+    <div class="legend-desc" data-i18n="descBp">Siła, z jaką krew napiera na ściany tętnic. Skurczowe (SYS) to ciśnienie podczas skurczu serca, a rozkurczowe (DIA) w czasie jego spoczynku.</div>
+    <div class="legend-item"><div class="color-box severe"></div> <span data-i18n="legSevere">Ciężkie nadciśnienie (SYS &ge; 180 / DIA &ge; 110)</span></div>
+    <div class="legend-item"><div class="color-box moderate"></div> <span data-i18n="legModerate">Umiarkowane nadciśnienie (SYS 160-179 / DIA 100-109)</span></div>
+    <div class="legend-item"><div class="color-box mild"></div> <span data-i18n="legMild">Łagodne nadciśnienie (SYS 140-159 / DIA 90-99)</span></div>
+    <div class="legend-item"><div class="color-box high-normal"></div> <span data-i18n="legHighNormal">Wysokie prawidłowe (SYS 130-139 / DIA 85-89)</span></div>
+    <div class="legend-item"><div class="color-box normal"></div> <span data-i18n="legNormal">Normalne (SYS &lt; 130 / DIA &lt; 85)</span></div>
+    <div class="legend-item"><div class="color-box low"></div> <span data-i18n="legLow">Niedociśnienie (SYS &lt; 90 / DIA &lt; 60)</span></div>
+
+    <h4 style="margin-top:25px; margin-bottom:5px; font-size:14px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;" data-i18n="legendTitleExtra">Wskaźniki PP i MAP</h4>
+    <div class="legend-desc" data-i18n="descPpMap"><b>PP (Ciśnienie Tętna):</b> Różnica między ciśnieniem skurczowym a rozkurczowym. Zbyt wysokie może świadczyć o sztywnieniu tętnic.<br><b>MAP (Średnie Tętnicze):</b> Uśrednione ciśnienie krwi w tętnicach, kluczowe dla prawidłowego niedotlenienia narządów.</div>
+    <div class="legend-item">
+        <span class="badge badge-normal" style="margin-right:12px; min-width: 80px; text-align: center;" data-i18n="badgeNormal">Norma</span> 
+        <span data-i18n="legPpMapNormal">PP: 30-50 | MAP: 70-100</span>
+    </div>
+    <div class="legend-item">
+        <span class="badge badge-warning" style="margin-right:12px; min-width: 80px; text-align: center;" data-i18n="badgeWarning">Uwaga</span> 
+        <span data-i18n="legPpMapWarning">PP: 51-60 | MAP: 101-110</span>
+    </div>
+    <div class="legend-item">
+        <span class="badge badge-danger" style="margin-right:12px; min-width: 80px; text-align: center;" data-i18n="badgeDanger">Alarm</span> 
+        <span data-i18n="legPpMapDanger">PP &lt;30 lub &gt;60 | MAP &lt;70 lub &gt;110</span>
+    </div>
+
+    <h4 style="margin-top:25px; margin-bottom:5px; font-size:14px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;" data-i18n="legendTitleBmi">Wskaźnik BMI</h4>
+    <div class="legend-desc" data-i18n="descBmi">Stosunek masy ciała (wagi) do wzrostu. Pomaga ocenić ryzyko chorób związanych z otyłością.</div>
+    <div class="legend-item">
+        <span class="badge badge-warning" style="margin-right:12px; min-width: 80px; text-align: center;" data-i18n="badgeUnderweight">Niedowaga</span> 
+        <span>&lt; 18.5</span>
+    </div>
+    <div class="legend-item">
+        <span class="badge badge-normal" style="margin-right:12px; min-width: 80px; text-align: center;" data-i18n="badgeNormal">Norma</span> 
+        <span>18.5 - 24.9</span>
+    </div>
+    <div class="legend-item">
+        <span class="badge badge-warning" style="margin-right:12px; min-width: 80px; text-align: center;" data-i18n="badgeOverweight">Nadwaga</span> 
+        <span>25.0 - 29.9</span>
+    </div>
+    <div class="legend-item">
+        <span class="badge badge-danger" style="margin-right:12px; min-width: 80px; text-align: center;" data-i18n="badgeObese">Otyłość</span> 
+        <span>&ge; 30.0</span>
+    </div>
+</div>
+
+<!-- MENU BOCZNE (SIDEBAR) -->
+<div id="menuOverlay" class="menu-overlay" onclick="toggleMenu(false)"></div>
+<div id="sideMenu" class="side-menu">
+    <div class="side-menu-header">
+        <h2 data-i18n="menuTitle">Ustawienia</h2>
+        <button class="hamburger-btn" style="color:var(--text-muted);" onclick="toggleMenu(false)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+    </div>
+    
+    <div style="display: flex; gap: 10px; margin-bottom: 30px;">
+        <button id="themeToggleBtn" class="modal-btn btn-close" style="margin:0; flex:1;" onclick="toggleTheme()">🌙 Ciemny</button>
+        <button id="langToggleBtn" class="modal-btn btn-close" style="margin:0; flex:1;" onclick="toggleLang()">🇵🇱 PL</button>
+    </div>
+
+    <h4 style="margin-top:0; margin-bottom:15px; font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;" data-i18n="setProfile">Zarządzanie Profilem</h4>
+    <div style="margin-bottom: 15px;">
+        <label data-i18n="setHeight">Twój wzrost (do BMI):</label>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <input type="number" id="profileHeightVal" placeholder="193" style="margin-bottom:0; flex:1;">
+            <button class="modal-btn" style="margin:0; width:auto; padding:14px 18px;" onclick="saveHeight()" data-i18n="btnSaveHeight">Zapisz</button>
+        </div>
+    </div>
+    <button class="modal-btn btn-close" style="margin-bottom:10px; justify-content:flex-start;" onclick="actionProfile('rename')">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        <span data-i18n="btnEditProf">Zmień nazwę profilu</span>
+    </button>
+    <button class="modal-btn btn-danger" style="margin-bottom:10px; justify-content:flex-start;" onclick="actionProfile('delete')">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        <span data-i18n="btnDelProf">Usuń ten profil</span>
+    </button>
+    <button class="modal-btn btn-danger" style="justify-content:flex-start;" onclick="actionProfile('clear')">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><polyline points="21 3 21 8 16 8"></polyline></svg>
+        <span data-i18n="btnClearData">Wyczyść pomiary profilu</span>
+    </button>
+
+    <h4 style="margin-top:35px; margin-bottom:15px; font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;" data-i18n="setBackup">Kopia Zapasowa</h4>
+    <button class="modal-btn btn-close" style="margin-top:0; margin-bottom:10px; justify-content:flex-start;" onclick="exportData()">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <span data-i18n="btnExport">Eksportuj dane (.json)</span>
+    </button>
+    <button class="modal-btn btn-close" style="justify-content:flex-start;" onclick="document.getElementById('importFileInput').click()">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        <span data-i18n="btnImport">Wczytaj dane (.json)</span>
+    </button>
+    <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="importData(event)">
+
+    <h4 style="margin-top:35px; margin-bottom:15px; font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;" data-i18n="setApp">Aplikacja</h4>
+    <button class="modal-btn btn-close" style="margin-top:0; margin-bottom:10px; justify-content:flex-start;" onclick="showModalWithAnim('guideModal')">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+        <span data-i18n="btnGuide">Poradnik pomiaru PTNT</span>
+    </button>
+    <button class="modal-btn btn-export-pdf" style="margin-bottom:10px; justify-content:flex-start;" onclick="exportPdf()">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <span data-i18n="btnPdf">Generuj raport PDF</span>
+    </button>
+    <button id="btnToggleNotifications" class="modal-btn btn-notify" style="justify-content:flex-start; margin-bottom:30px;" onclick="toggleNotify()">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <span data-i18n="btnNotifOn">Włącz powiadomienia</span>
+    </button>
+</div>
+
+<!-- MODAL DODAWANIA/EDYCJI POMIARU -->
+<div class="modal" id="modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0; font-size:20px; font-weight:800; margin-bottom:20px;"><span data-i18n="modTitle">Pomiar:</span> <span id="selectedDate" style="color:var(--primary);"></span></h3>
+        
+        <label data-i18n="modTime">Godzina pomiaru:</label>
+        <div style="display:flex; gap:10px;">
+            <select id="timeSlot" style="flex:1;" onchange="loadFormData()">
+                <option value="am" data-i18n="morning">Rano</option>
+                <option value="pm" data-i18n="evening">Wieczór</option>
+            </select>
+            <input type="time" id="timeVal" style="flex:1;">
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <div style="flex:1;">
+                <label data-i18n="modSys" style="color:#ef4444;">SYS (Skurczowe):</label>
+                <input type="number" id="sysVal" placeholder="120" style="font-size:20px; font-weight:bold; text-align:center;">
+            </div>
+            <div style="flex:1;">
+                <label data-i18n="modDia" style="color:#3b82f6;">DIA (Rozkurczowe):</label>
+                <input type="number" id="diaVal" placeholder="80" style="font-size:20px; font-weight:bold; text-align:center;">
+            </div>
+        </div>
+        
+        <label data-i18n="modPul">Puls:</label>
+        <input type="number" id="pulVal" placeholder="70">
+
+        <!-- Opcje: Ramię i Pozycja -->
+        <div style="display: flex; gap: 10px;">
+            <div style="flex:1;">
+                <label data-i18n="modArm">Ramię:</label>
+                <select id="armVal">
+                    <option value="left" data-i18n="armLeft">Lewe</option>
+                    <option value="right" data-i18n="armRight">Prawe</option>
+                </select>
+            </div>
+            <div style="flex:1;">
+                <label data-i18n="modPos">Pozycja:</label>
+                <select id="posVal">
+                    <option value="sit" data-i18n="posSit">Siedząca</option>
+                    <option value="lie" data-i18n="posLie">Leżąca</option>
+                    <option value="stand" data-i18n="posStand">Stojąca</option>
+                </select>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <div style="flex:1;">
+                <label data-i18n="modGluc" style="color:#f59e0b;">Cukier (mg/dL):</label>
+                <input type="number" id="glucVal" placeholder="...">
+            </div>
+            <div style="flex:1;">
+                <label data-i18n="modWeight">Waga (kg):</label>
+                <input type="number" step="0.1" id="weightVal" placeholder="...">
+            </div>
+        </div>
+        
+        <label data-i18n="modTags">Kontekst / Tagi:</label>
+        <div class="tags-container" id="tagsContainer">
+            <!-- Wygenerowane tagi -->
+        </div>
+        
+        <label data-i18n="modNote">Notatka:</label>
+        <textarea id="noteVal" rows="2" placeholder="..."></textarea>
+        
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button id="btnDeleteMeas" class="modal-btn btn-danger" style="display:none;" onclick="deleteMeas()" data-i18n="btnDeleteMeas">Usuń wpis</button>
+            <button class="modal-btn btn-close" onclick="hideModalWithAnim('modal')" data-i18n="btnCancel">Anuluj</button>
+            <button class="modal-btn" onclick="saveMeas()" data-i18n="btnSave">Zapisz</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast">Komunikat</div>
+
+<!-- MODALE -->
+<div id="confirmModal" class="confirm-modal">
+    <div class="confirm-content">
+        <h3 id="confirmTitle" style="margin-top:0; font-size:22px; font-weight:800;">Uwaga</h3>
+        <p id="confirmText" style="color:var(--text-muted); line-height:1.5; margin-bottom:20px;">Czy na pewno?</p>
+        <div class="confirm-buttons">
+            <button id="btnConfirmNo" class="modal-btn btn-close" data-i18n="btnCancel">Anuluj</button>
+            <button id="btnConfirmYes" class="modal-btn btn-danger">Tak</button>
+        </div>
+    </div>
+</div>
+
+<div id="promptModal" class="input-modal">
+    <div class="confirm-content">
+        <h3 id="promptTitle" style="margin-top:0; font-size:22px; font-weight:800;">Tytuł</h3>
+        <p id="promptText" style="color:var(--text-muted); font-size: 14px; margin-bottom:15px;">Wpisz tekst:</p>
+        <input type="text" id="promptInput" placeholder="..." style="margin-bottom: 0;">
+        <div class="confirm-buttons">
+            <button id="btnPromptCancel" class="modal-btn btn-close" data-i18n="btnCancel">Anuluj</button>
+            <button id="btnPromptSave" class="modal-btn" data-i18n="btnSave">Zapisz</button>
+        </div>
+    </div>
+</div>
+
+<div id="healthAlertModal" class="alert-modal">
+    <div class="alert-content" style="border-color:var(--danger);">
+        <div class="alert-icon">
+            <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        </div>
+        <h3 style="margin-top:0; color:var(--danger); font-size:22px; font-weight:800;" data-i18n="alertTitle">Uwaga! Wysoki wynik</h3>
+        <p style="color:var(--text-main); line-height:1.5; font-size:15px; margin-bottom:25px;" id="alertText">
+            Twój pomiar wskazuje na bardzo wysokie ciśnienie. Odpocznij przez 15 minut i zmierz je ponownie.
+        </p>
+        <button id="btnAlertClose" class="modal-btn btn-close" style="width:100%; border-color:var(--danger);" onclick="hideModalWithAnim('healthAlertModal')" data-i18n="btnUnderstood">Zrozumiałem</button>
+    </div>
+</div>
+
+<div id="guideModal" class="alert-modal">
+    <div class="alert-content" style="background: var(--bg-card); border-color: var(--primary);">
+        <div class="alert-icon" style="color: var(--primary);">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        </div>
+        <h3 style="margin-top:0; color:var(--text-main); font-size:22px; font-weight:800;" data-i18n="guideTitle">Zasady pomiaru (PTNT)</h3>
+        <p style="color:var(--text-muted); line-height:1.6; font-size:14px; text-align:left; margin-bottom:25px;" data-i18n="guideText">
+            1. Odpocznij w ciszy 5 minut przed pomiarem.<br><br>2. Usiądź wygodnie, oprzyj plecy, stopy płasko.<br><br>3. Ramię na wysokości serca.<br><br>4. Nie rozmawiaj.<br><br>5. Zrezygnuj z kawy i papierosów na 30 minut przed.
+        </p>
+        <button class="modal-btn" style="width:100%;" onclick="hideModalWithAnim('guideModal')" data-i18n="btnUnderstood">Zrozumiałem</button>
+    </div>
+</div>
+
+<div id="printArea"></div>
+
+<script>
+    // === SŁOWNIKI ===
+    const translations = {
+        pl: {
+            menuTitle: "Ustawienia", themeDark: "🌙 Ciemny", themeLight: "☀️ Jasny",
+            profPrefix: "Profil: ", addProfBtn: "+ Dodaj nową osobę",
+            tabMonth: "Miesiąc", tabWeek: "Tydzień", tabChart: "Wykres",
+            months: ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"],
+            daysShort: ["Pn","Wt","Śr","Cz","Pt","Sb","Nd"], daysFull: ["Niedziela","Poniedziałek","Wtorek","Środa","Czwartek","Piątek","Sobota"],
+            stat7: "Ostatnie 7 dni", stat30: "Ostatnie 30 dni", statMorning: "Rano:", statEvening: "Wieczór:", chartAnalysis: "Analiza pomiarów",
+            statPP: "Ciśnienie Tętna (PP):", statMAP: "Średnie Tętnicze (MAP):", pp: "PP", map: "MAP",
+            legendTitle: "Ciśnienie tętnicze (WHO)", descBp: "Siła, z jaką krew napiera na ściany tętnic. Skurczowe (SYS) to ciśnienie podczas skurczu serca, a rozkurczowe (DIA) w czasie jego spoczynku.",
+            legSevere: "Ciężkie nadciśnienie (SYS &ge; 180 / DIA &ge; 110)", legModerate: "Umiarkowane nadciśnienie (SYS 160-179 / DIA 100-109)",
+            legMild: "Łagodne nadciśnienie (SYS 140-159 / DIA 90-99)", legHighNormal: "Wysokie prawidłowe (SYS 130-139 / DIA 85-89)",
+            legNormal: "Normalne (SYS &lt; 130 / DIA &lt; 85)", legLow: "Niedociśnienie (SYS &lt; 90 / DIA &lt; 60)",
+            legendTitleExtra: "Wskaźniki PP i MAP", descPpMap: "<b>PP:</b> Różnica między skurczowym a rozkurczowym. Zbyt wysokie świadczy o sztywnieniu tętnic.<br><b>MAP:</b> Uśrednione ciśnienie krwi, kluczowe dla niedotlenienia narządów.",
+            badgeNormal: "Norma", badgeWarning: "Uwaga", badgeDanger: "Alarm",
+            legPpMapNormal: "PP: 30-50 | MAP: 70-100", legPpMapWarning: "PP: 51-60 | MAP: 101-110", legPpMapDanger: "PP &lt;30 lub &gt;60 | MAP &lt;70 lub &gt;110",
+            legendTitleBmi: "Wskaźnik BMI", descBmi: "Stosunek masy ciała do wzrostu. Pomaga ocenić ryzyko chorób.",
+            badgeUnderweight: "Niedowaga", badgeOverweight: "Nadwaga", badgeObese: "Otyłość",
+            setProfile: "Zarządzanie Profilem", setHeight: "Twój wzrost (do BMI):", btnSaveHeight: "Zapisz", msgHeightSaved: "Zapisano wzrost",
+            btnEditProf: "Zmień nazwę profilu", btnDelProf: "Usuń ten profil", btnClearData: "Wyczyść pomiary profilu",
+            setBackup: "Kopia Zapasowa", btnExport: "Eksportuj dane (.json)", btnImport: "Wczytaj dane (.json)", 
+            msgExported: "Kopia zapisana", msgImported: "Wczytano kopię", msgImportErr: "Błąd pliku",
+            setApp: "Aplikacja", btnGuide: "Poradnik pomiaru PTNT", btnPdf: "Generuj raport PDF",
+            guideTitle: "Zasady pomiaru (PTNT)", guideText: "1. Odpocznij w ciszy 5 minut przed pomiarem.<br><br>2. Usiądź wygodnie, stopy płasko.<br><br>3. Mankiet na wysokości serca.<br><br>4. Nie rozmawiaj.<br><br>5. Zrezygnuj z kawy i papierosów 30 min przed.",
+            btnNotifOn: "Włącz powiadomienia", btnNotifOff: "Wyłącz powiadomienia", notifGranted: "Powiadomienia włączone", notifDenied: "Brak uprawnień", notifNoSupport: "Brak wsparcia w przeglądarce", notifOff: "Powiadomienia wyłączone", notifBody: "Czas na pomiar!",
+            btnSave: "Zapisz", btnCancel: "Anuluj", btnYes: "Tak", btnUnderstood: "Zrozumiałem", bmi: "BMI", btnDeleteMeas: "Usuń wpis",
+            modTitle: "Pomiar:", modTime: "Godzina:", modSys: "SYS (Skurczowe):", modDia: "DIA (Rozkurczowe):",
+            modArm: "Ramię:", armLeft: "Lewe", armRight: "Prawe", modPos: "Pozycja:", posSit: "Siedząca", posLie: "Leżąca", posStand: "Stojąca",
+            modPul: "Puls:", modGluc: "Cukier (mg/dL):", modWeight: "Waga (kg):", modTags: "Tagi:", modNote: "Notatka:",
+            morning: "Rano", evening: "Wieczór", addMeasAm: "+ Dodaj pomiar (rano)", addMeasPm: "+ Dodaj pomiar (wieczór)",
+            tagCoffee: "☕ Kawa", tagStress: "🌩️ Stres", tagHeadache: "🤕 Ból głowy", tagWork: "🏋️ Praca fizyczna", tagPills: "💊 Leki",
+            addCustomTag: "Dodaj własny", promptNewTag: "Wpisz nazwę nowego tagu:",
+            insightsTitle: "Asystent Kardiologiczny", insNeedMoreData: "Dodaj min. 5 pomiarów, aby Asystent przeanalizował wyniki z 30 dni.",
+            insMorningHigh: "Ciśnienie skurczowe (SYS) jest średnio o {X} mmHg wyższe rano.", insEveningHigh: "Ciśnienie skurczowe (SYS) jest średnio o {X} mmHg wyższe wieczorem.",
+            insStableDiff: "Twoje ciśnienie rano i wieczorem jest stabilne, bez dużych wahań.", insStressPulse: "Gdy zaznaczasz 'Stres', puls jest średnio o {X} BPM wyższy.",
+            insNormalStreak: "Świetnie! Ostatnie {X} pomiary z rzędu w idealnej normie.", insWarning: "Uwaga - Twoje ostatnie wyniki przekraczają normę. Pamiętaj o odpoczynku.",
+            msgProfChanged: "Profil:", msgProfAddTitle: "Nowy profil", msgProfAddText: "Imię:", msgProfAdded: "Dodano profil", msgProfExists: "Istnieje", msgEmptyStr: "Puste pole",
+            msgRenameTitle: "Zmień nazwę", msgRenameText: "Nowa nazwa:", msgRenameDone: "Zmieniono",
+            msgDelErr: "Ostatni profil.", msgDelTitle: "Usuń profil", msgDelText1: "Usunąć profil", msgDelText2: "i dane?", btnDelConfirm: "Usuń", msgDelDone: "Usunięto",
+            msgDelMeasText: "Na pewno usunąć pomiar?", msgClearTitle: "Czyszczenie", msgClearText: "Usunąć pomiary dla:", btnClearConfirm: "Wyczyść", msgClearDone: "Wyczyszczono",
+            msgErrVal: "Błędne wartości SYS/DIA.", msgSaved: "Zapisano", msgMeasDeleted: "Usunięto",
+            alertTitle: "Wysoki wynik", alertText: "Pomiar wskazuje na wysokie ciśnienie. Odpocznij 15 min i ponów.<br><br>Jeśli się utrzyma, <b>skonsultuj się z lekarzem</b>.",
+            pdfTitle: "Dzienniczek Ciśnienia", pdfSub: "Raport CardioLog", pdfPatient: "Pacjent:", pdfGen: "Dnia:",
+            pdfWeek: "Tydzień:", pdfWeekAvg: "Średnia z tygodnia:", pdfChart: "Wykres (30 dni)", pdfGenMsg: "Generowanie raportu...",
+            catSevere: "Ciężkie nadciśnienie", catModerate: "Umiarkowane", catMild: "Łagodne nadciśnienie", catHighNormal: "Wysokie praw.", catNormal: "Normalne", catLow: "Niedociśnienie",
+            tDate: "Data", tTime: "Godz.", tBp: "SYS / DIA", tPul: "Puls", tExtra: "Informacje", sGluc: "Cukier", sWeight: "Waga", sTags: "Tagi", sNote: "Notatka", tPos: "Pozycja"
+        },
+        en: {
+            menuTitle: "Settings", themeDark: "🌙 Dark", themeLight: "☀️ Light",
+            profPrefix: "Profile: ", addProfBtn: "+ Add new person",
+            tabMonth: "Month", tabWeek: "Week", tabChart: "Chart",
+            months: ["January","February","March","April","May","June","July","August","September","October","November","December"],
+            daysShort: ["Mo","Tu","We","Th","Fr","Sa","Su"], daysFull: ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+            stat7: "Last 7 days", stat30: "Last 30 days", statMorning: "Morning:", statEvening: "Evening:", chartAnalysis: "Analysis",
+            statPP: "Pulse Pressure (PP):", statMAP: "Mean Arterial (MAP):", pp: "PP", map: "MAP",
+            legendTitle: "Blood Pressure (WHO)", descBp: "Systolic (SYS) is during heartbeat, Diastolic (DIA) is resting.",
+            legSevere: "Severe (SYS &ge; 180 / DIA &ge; 110)", legModerate: "Moderate (SYS 160-179 / DIA 100-109)",
+            legMild: "Mild (SYS 140-159 / DIA 90-99)", legHighNormal: "High Normal (SYS 130-139 / DIA 85-89)",
+            legNormal: "Normal (SYS &lt; 130 / DIA &lt; 85)", legLow: "Hypotension (SYS &lt; 90 / DIA &lt; 60)",
+            legendTitleExtra: "PP & MAP", descPpMap: "<b>PP:</b> Difference between SYS and DIA.<br><b>MAP:</b> Average blood pressure.",
+            badgeNormal: "Normal", badgeWarning: "Warning", badgeDanger: "Alert",
+            legPpMapNormal: "PP: 30-50 | MAP: 70-100", legPpMapWarning: "PP: 51-60 | MAP: 101-110", legPpMapDanger: "PP &lt;30 or &gt;60 | MAP &lt;70 or &gt;110",
+            legendTitleBmi: "BMI", descBmi: "Ratio of body weight to height.",
+            badgeUnderweight: "Underweight", badgeOverweight: "Overweight", badgeObese: "Obesity",
+            setProfile: "Profile", setHeight: "Height (cm):", btnSaveHeight: "Save", msgHeightSaved: "Saved",
+            btnEditProf: "Rename", btnDelProf: "Delete", btnClearData: "Clear records",
+            setBackup: "Backup", btnExport: "Export (.json)", btnImport: "Import (.json)", 
+            msgExported: "Exported", msgImported: "Imported", msgImportErr: "Error",
+            setApp: "App", btnGuide: "Measurement Guide", btnPdf: "Export PDF",
+            guideTitle: "Measurement Rules", guideText: "1. Rest 5 mins.<br><br>2. Sit properly.<br><br>3. Arm at heart level.<br><br>4. Don't talk.<br><br>5. No coffee 30 mins prior.",
+            btnNotifOn: "Enable notifications", btnNotifOff: "Disable notifications", notifGranted: "Enabled", notifDenied: "Denied", notifNoSupport: "Not supported", notifOff: "Disabled", notifBody: "Time to log measurement!",
+            btnSave: "Save", btnCancel: "Cancel", btnYes: "Yes", btnUnderstood: "I understand", bmi: "BMI", btnDeleteMeas: "Delete",
+            modTitle: "Measurement:", modTime: "Time:", modSys: "SYS:", modDia: "DIA:",
+            modArm: "Arm:", armLeft: "Left", armRight: "Right", modPos: "Position:", posSit: "Sitting", posLie: "Lying", posStand: "Standing",
+            modPul: "Pulse:", modGluc: "Gluc (mg/dL):", modWeight: "Weight (kg):", modTags: "Tags:", modNote: "Note:",
+            morning: "Morning", evening: "Evening", addMeasAm: "+ Add (morning)", addMeasPm: "+ Add (evening)",
+            tagCoffee: "☕ Coffee", tagStress: "🌩️ Stress", tagHeadache: "🤕 Headache", tagWork: "🏋️ Work", tagPills: "💊 Pills",
+            addCustomTag: "Add custom", promptNewTag: "Tag name:",
+            insightsTitle: "Assistant", insNeedMoreData: "Add 5+ readings for insights.",
+            insMorningHigh: "SYS is {X} mmHg higher in the morning.", insEveningHigh: "SYS is {X} mmHg higher in the evening.",
+            insStableDiff: "BP is stable across the day.", insStressPulse: "Pulse rises {X} BPM during 'Stress'.",
+            insNormalStreak: "Great! Last {X} readings in normal range.", insWarning: "Recent readings are high. Rest well.",
+            msgProfChanged: "Profile:", msgProfAddTitle: "New profile", msgProfAddText: "Name:", msgProfAdded: "Added", msgProfExists: "Exists", msgEmptyStr: "Empty",
+            msgRenameTitle: "Rename", msgRenameText: "New name:", msgRenameDone: "Renamed",
+            msgDelErr: "Cannot delete last.", msgDelTitle: "Delete profile", msgDelText1: "Delete", msgDelText2: "and records?", btnDelConfirm: "Delete", msgDelDone: "Deleted",
+            msgDelMeasText: "Delete reading?", msgClearTitle: "Clear", msgClearText: "Clear data for:", btnClearConfirm: "Clear", msgClearDone: "Cleared",
+            msgErrVal: "Invalid SYS/DIA.", msgSaved: "Saved", msgMeasDeleted: "Deleted",
+            alertTitle: "High Reading", alertText: "Very high blood pressure. Rest 15 mins and retry.<br><br>If it persists, <b>see a doctor</b>.",
+            pdfTitle: "BP Diary", pdfSub: "CardioLog Report", pdfPatient: "Patient:", pdfGen: "Date:",
+            pdfWeek: "Week:", pdfWeekAvg: "Weekly Avg:", pdfChart: "Chart (30 days)", pdfGenMsg: "Generating PDF...",
+            catSevere: "Severe", catModerate: "Moderate", catMild: "Mild", catHighNormal: "High Normal", catNormal: "Normal", catLow: "Hypotension",
+            tDate: "Date", tTime: "Time", tBp: "SYS/DIA", tPul: "Pulse", tExtra: "Info", sGluc: "Gluc", sWeight: "Weight", sTags: "Tags", sNote: "Note", tPos: "Pos"
+        }
+    };
+
+    let currentLang = localStorage.getItem('bpLang') || 'pl';
+    let isLightMode = localStorage.getItem("bpTheme") === "light";
+    let profiles = JSON.parse(localStorage.getItem('bpProfilesList')) || ['Damian'];
+    let currentProfile = localStorage.getItem('bpCurrentProfile') || profiles[0];
+    let records = {}, currentMode = 'month', displayDate = new Date(), bpChartInstance = null, currentTags = [], rawChartRecords = [], selectedDateStr = "";
+
+    function t(key) { return translations[currentLang][key] || key; }
+
+    function applyLanguage() {
+        document.getElementById("htmlTag").lang = currentLang;
+        document.getElementById("langToggleBtn").textContent = currentLang === 'pl' ? "🇵🇱 PL" : "🇬🇧 EN";
+        
+        document.querySelectorAll("[data-i18n]").forEach(el => {
+            const key = el.getAttribute("data-i18n");
+            if (translations[currentLang][key]) {
+                if(el.tagName === 'SPAN' && el.previousElementSibling && el.previousElementSibling.tagName === 'svg') el.innerHTML = translations[currentLang][key];
+                else el.innerHTML = translations[currentLang][key];
+            }
+        });
+        document.getElementById("noteVal").placeholder = t('modNote').replace(":", "");
+        updateNotifyBtn(); updateThemeBtnText(); renderProfileMenu(); renderUI();
+    }
+
+    function applyTheme() {
+        if(isLightMode) document.body.classList.add("light-mode"); else document.body.classList.remove("light-mode");
+        updateThemeBtnText(); if(currentMode === 'chart') renderStatsAndChart();
+    }
+
+    function updateThemeBtnText() { document.getElementById("themeToggleBtn").textContent = isLightMode ? t('themeLight') : t('themeDark'); }
+    function toggleLang() { currentLang = currentLang === 'pl' ? 'en' : 'pl'; localStorage.setItem('bpLang', currentLang); applyLanguage(); }
+    function toggleTheme() { isLightMode = !isLightMode; localStorage.setItem("bpTheme", isLightMode ? "light" : "dark"); applyTheme(); }
+
+    function toggleMenu(show) {
+        const o = document.getElementById("menuOverlay"), m = document.getElementById("sideMenu");
+        if(show) { o.style.display="block"; setTimeout(()=>{ o.style.opacity="1"; m.classList.add("open"); }, 10); } 
+        else { o.style.opacity="0"; m.classList.remove("open"); setTimeout(()=>{ o.style.display="none"; }, 300); }
+    }
+    function toggleProfileMenu() { document.getElementById("profileMenu").classList.toggle("open"); }
+
+    function getStorageKey() { return "bpApp_" + currentProfile; }
+    
+    function loadProfileData() {
+        if(!localStorage.getItem(getStorageKey()) && localStorage.getItem("bpDiaryAppPro_V2")) localStorage.setItem(getStorageKey(), localStorage.getItem("bpDiaryAppPro_V2"));
+        records = JSON.parse(localStorage.getItem(getStorageKey())) || {};
+        let savedHeight = localStorage.getItem("bpHeight_" + currentProfile);
+        if(!savedHeight && currentProfile === 'Damian') { savedHeight = '193'; localStorage.setItem("bpHeight_" + currentProfile, savedHeight); }
+        document.getElementById("profileHeightVal").value = savedHeight || '';
+        renderUI();
+    }
+
+    function saveHeight() { localStorage.setItem("bpHeight_" + currentProfile, document.getElementById("profileHeightVal").value); showToast(t('msgHeightSaved'), true); renderUI(); }
+
+    function renderProfileMenu() {
+        const pm = document.getElementById("profileMenu"); pm.innerHTML = ""; document.getElementById("currentProfileLabel").textContent = t('profPrefix') + currentProfile;
+        profiles.forEach(p => {
+            const item = document.createElement("div"); item.className = "profile-item" + (p === currentProfile ? " active-profile" : "");
+            item.innerHTML = `<span>${p}</span>` + (p === currentProfile ? `<span style="font-size:12px;">✔️</span>` : "");
+            item.onclick = (e) => { e.stopPropagation(); currentProfile = p; localStorage.setItem('bpCurrentProfile', currentProfile); toggleProfileMenu(); renderProfileMenu(); loadProfileData(); showToast(t('msgProfChanged') + " " + currentProfile, true); };
+            pm.appendChild(item);
+        });
+        const addBtn = document.createElement("div"); addBtn.className = "profile-item profile-add-btn"; addBtn.textContent = t('addProfBtn');
+        addBtn.onclick = (e) => { e.stopPropagation(); toggleProfileMenu(); showPrompt(t('msgProfAddTitle'), t('msgProfAddText'), "", (newName) => { if (!profiles.includes(newName)) { profiles.push(newName); localStorage.setItem('bpProfilesList', JSON.stringify(profiles)); currentProfile = newName; localStorage.setItem('bpCurrentProfile', currentProfile); renderProfileMenu(); loadProfileData(); showToast(t('msgProfAdded'), true); } else showToast(t('msgProfExists')); }); };
+        pm.appendChild(addBtn);
+    }
+
+    function showModalWithAnim(id) { document.getElementById(id).style.display = "flex"; setTimeout(() => document.getElementById(id).classList.add("show"), 10); }
+    function hideModalWithAnim(id) { document.getElementById(id).classList.remove("show"); setTimeout(() => document.getElementById(id).style.display = "none", 300); }
+    function showToast(msg, isSuccess = false) { const tEl = document.getElementById("toast"); tEl.innerHTML = msg; tEl.style.background = isSuccess ? "#10b981" : "#ef4444"; tEl.classList.add("show"); setTimeout(() => tEl.classList.remove("show"), 3000); }
+    function showConfirm(title, msg, btnText, onYes) { document.getElementById("confirmTitle").innerHTML = title; document.getElementById("confirmText").innerHTML = msg; document.getElementById("btnConfirmYes").textContent = btnText; showModalWithAnim("confirmModal"); document.getElementById("btnConfirmYes").onclick = () => { hideModalWithAnim("confirmModal"); onYes(); }; }
+    function showPrompt(title, text, defVal, onSave) { document.getElementById("promptTitle").textContent = title; document.getElementById("promptText").textContent = text; const inp = document.getElementById("promptInput"); inp.value = defVal; showModalWithAnim("promptModal"); inp.focus(); document.getElementById("btnPromptSave").onclick = () => { const val = inp.value.trim(); if(val !== "") { hideModalWithAnim("promptModal"); onSave(val); } else showToast(t('msgEmptyStr')); }; }
+    function showHealthAlert() { document.getElementById("alertText").innerHTML = t('alertText'); showModalWithAnim("healthAlertModal"); }
+
+    function actionProfile(act) {
+        toggleMenu(false);
+        setTimeout(() => {
+            if(act === 'rename') showPrompt(t('msgRenameTitle'), t('msgRenameText'), currentProfile, (n) => { if(n === currentProfile) return; if(profiles.includes(n)) { showToast(t('msgProfExists')); return; } const oKey = getStorageKey(), d = localStorage.getItem(oKey), h = localStorage.getItem("bpHeight_" + currentProfile), idx = profiles.indexOf(currentProfile); profiles[idx] = n; localStorage.setItem('bpProfilesList', JSON.stringify(profiles)); currentProfile = n; localStorage.setItem('bpCurrentProfile', n); if(d){localStorage.setItem(getStorageKey(), d); localStorage.removeItem(oKey);} if(h){localStorage.setItem("bpHeight_" + n, h); localStorage.removeItem("bpHeight_" + profiles[idx]);} renderProfileMenu(); showToast(t('msgRenameDone'), true); });
+            if(act === 'delete') { if (profiles.length <= 1) { showToast(t('msgDelErr')); return; } showConfirm(t('msgDelTitle'), `${t('msgDelText1')} "${currentProfile}" ${t('msgDelText2')}`, t('btnDelConfirm'), () => { localStorage.removeItem(getStorageKey()); localStorage.removeItem("bpHeight_" + currentProfile); profiles = profiles.filter(p => p !== currentProfile); localStorage.setItem('bpProfilesList', JSON.stringify(profiles)); currentProfile = profiles[0]; localStorage.setItem('bpCurrentProfile', currentProfile); renderProfileMenu(); loadProfileData(); showToast(t('msgDelDone'), true); }); }
+            if(act === 'clear') showConfirm(t('msgClearTitle'), `${t('msgClearText')} ${currentProfile}?`, t('btnClearConfirm'), () => { records = {}; localStorage.setItem(getStorageKey(), JSON.stringify(records)); renderUI(); showToast(t('msgClearDone'), true); });
+        }, 350);
+    }
+
+    function exportData() { const exp = {}; for(let i=0; i<localStorage.length; i++){ const k=localStorage.key(i); if(k.startsWith("bp")) exp[k]=localStorage.getItem(k); } const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(exp)], {type:"application/json"})); a.download = `CardioLog_Backup_${formatDate(new Date())}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); toggleMenu(false); showToast(t('msgExported'), true); }
+    function importData(e) { const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); let v = 0; for(const k in d) { if(k.startsWith("bp")) { localStorage.setItem(k, d[k]); v++; } } if(v > 0) { profiles = JSON.parse(localStorage.getItem('bpProfilesList')) || ['Damian']; currentProfile = localStorage.getItem('bpCurrentProfile') || profiles[0]; renderProfileMenu(); loadProfileData(); toggleMenu(false); showToast(t('msgImported'), true); } else showToast(t('msgImportErr')); } catch(err) { showToast(t('msgImportErr')); } document.getElementById("importFileInput").value = ""; }; r.readAsText(f); }
+
+    function switchMode(m) { currentMode = m; ["btnMonth", "btnWeek", "btnChart"].forEach(id => document.getElementById(id).classList.toggle("active", id === "btn" + m.charAt(0).toUpperCase() + m.slice(1))); const c = document.getElementById("viewContainer"); c.classList.remove("fade-in"); void c.offsetWidth; c.classList.add("fade-in"); renderUI(); }
+    function navDate(dir) { if (currentMode === 'month') displayDate.setMonth(displayDate.getMonth() + dir); else if (currentMode === 'week') displayDate.setDate(displayDate.getDate() + (dir * 7)); const c = document.getElementById("viewContainer"); c.classList.remove("fade-in"); void c.offsetWidth; c.classList.add("fade-in"); renderUI(); }
+
+    function getStartOfWeek(date) { const d = new Date(date), day = d.getDay(), diff = d.getDate() - day + (day === 0 ? -6 : 1); return new Date(d.getFullYear(), d.getMonth(), diff); }
+    function formatDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+    function getColorClass(s, d) { if(!s||!d) return ""; if(s>=180||d>=110) return "severe"; if(s>=160||d>=100) return "moderate"; if(s>=140||d>=90) return "mild"; if(s>=130||d>=85) return "high-normal"; if(s<90||d<60) return "low"; return "normal"; }
+    function formatBadge(val, type) { if(val === '-') return val; let cClass = ''; if(type === 'pp') cClass = val<30||val>60 ? 'badge-danger' : (val>50 ? 'badge-warning' : 'badge-normal'); else if(type === 'map') cClass = val<70||val>110 ? 'badge-danger' : (val>100 ? 'badge-warning' : 'badge-normal'); else if(type === 'bmi') cClass = val<18.5||val>=25 ? (val>=30 ? 'badge-danger' : 'badge-warning') : 'badge-normal'; return `<span class="badge ${cClass}">${val}</span>`; }
+    function calcD(r) { let pp=parseInt(r.sys)-parseInt(r.dia); return {pp, map:Math.round(parseInt(r.dia)+(pp/3))}; }
+
+    function renderUI() {
+        document.getElementById('monthContainer').style.display='none'; document.getElementById('weekGrid').style.display='none'; document.getElementById('chartContainer').style.display='none'; document.getElementById('legendBox').style.display='block';
+        if(currentMode === 'month') {
+            document.getElementById('monthContainer').style.display='block'; document.getElementById("calendarDaysHeader").innerHTML = ""; t('daysShort').forEach(d => document.getElementById("calendarDaysHeader").innerHTML += `<div>${d}</div>`);
+            const y = displayDate.getFullYear(), m = displayDate.getMonth(), grid = document.getElementById("monthGrid"); grid.innerHTML = ""; document.getElementById("dateLabel").textContent = `${t('months')[m]} ${y}`;
+            const fd = new Date(y,m,1).getDay(), dim = new Date(y,m+1,0).getDate(), off = fd===0?6:fd-1;
+            for(let i=0; i<off; i++) grid.appendChild(document.createElement("div"));
+            for(let i=1; i<=dim; i++) {
+                const k = `${y}-${String(m+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`, dEl = document.createElement("div"); dEl.className = "day"; dEl.textContent = i;
+                let dHtml = "<div class='dots'>"; if(records[k]) { if(records[k].am) dHtml += `<div class='dot ${getColorClass(records[k].am.sys, records[k].am.dia)}'></div>`; if(records[k].pm) dHtml += `<div class='dot ${getColorClass(records[k].pm.sys, records[k].pm.dia)}'></div>`; } dHtml += "</div>";
+                dEl.innerHTML += dHtml; dEl.onclick = () => openModal(k); grid.appendChild(dEl);
+            }
+        } else if(currentMode === 'week') {
+            const grid = document.getElementById("weekGrid"); grid.style.display='flex'; grid.innerHTML=""; let sw=getStartOfWeek(displayDate), ew=new Date(sw); ew.setDate(sw.getDate()+6);
+            document.getElementById("dateLabel").textContent=`${String(sw.getDate()).padStart(2,'0')}.${String(sw.getMonth()+1).padStart(2,'0')} - ${String(ew.getDate()).padStart(2,'0')}.${String(ew.getMonth()+1).padStart(2,'0')}`;
+            for(let i=0; i<7; i++) {
+                let cd=new Date(sw); cd.setDate(sw.getDate()+i); let k=formatDate(cd), wHtml=`<div class="week-day"><div class="week-day-header">${i===6?t('daysFull')[0]:t('daysFull')[i+1]}, ${k}</div>`;
+                ['am','pm'].forEach(s => {
+                    let d = records[k]?.[s];
+                    if(d) {
+                        let cx=calcD(d), xL=[`💓 ${t('pp')} ${formatBadge(cx.pp,'pp')} &nbsp;&nbsp; ${t('map')} ${formatBadge(cx.map,'map')}`], bL=[];
+                        if(d.weight){ let wStr=`⚖️ ${t('sWeight').replace(':','')} ${d.weight}kg`, h=localStorage.getItem("bpHeight_"+currentProfile); if(h&&h>50)wStr+=` (${t('bmi')}: ${formatBadge((d.weight/Math.pow(h/100,2)).toFixed(1),'bmi')})`; bL.push(wStr); }
+                        if(d.gluc) bL.push(`🩸 ${t('sGluc').replace(':','')} ${d.gluc}`); if(bL.length) xL.push(bL.join(' &nbsp;&nbsp; '));
+                        let cL=[]; if(d.arm)cL.push(`💪 `+(d.arm==='left'?t('armLeft'):t('armRight'))); if(d.pos)cL.push(`🪑 `+(d.pos==='sit'?t('posSit'):(d.pos==='lie'?t('posLie'):t('posStand')))); if(cL.length) xL.push(cL.join(' &nbsp;&nbsp; '));
+                        wHtml+=`<div class="measurement ${getColorClass(d.sys,d.dia)}" onclick="openModal('${k}','${s}')"><div class="meas-info"><span class="meas-title">${s==='am'?t('morning'):t('evening')} (${d.time})</span><span class="meas-values">${d.sys} / ${d.dia} <small>${t('modPul').replace(':','')} ${d.pul}</small></span></div><div class="meas-extra">${xL.join('<br>')}</div>${d.tags&&d.tags.length?`<div class="meas-tags">${d.tags.map(tk=>`<span class="meas-tag">${t("tag"+tk.charAt(0).toUpperCase()+tk.slice(1))||tk}</span>`).join('')}</div>`:''}${d.note?`<div class="meas-note">${d.note}</div>`:''}</div>`;
+                    } else wHtml+=`<div class="measurement empty" onclick="openModal('${k}','${s}')">${s==='am'?t('addMeasAm'):t('addMeasPm')}</div>`;
+                }); wHtml+="</div>"; grid.innerHTML+=wHtml;
+            }
+        } else if(currentMode === 'chart') {
+            document.getElementById('chartContainer').style.display='block'; document.getElementById('legendBox').style.display='none'; document.getElementById("dateLabel").textContent=t('chartAnalysis');
+            const getA=(l)=>{let amS=0,amD=0,amC=0,pmS=0,pmD=0,pmC=0,pp=0,map=0,tc=0,n=new Date(); for(let i=0;i<l;i++){let r=records[formatDate(new Date(n.getTime()-(i*86400000)))]; if(r){if(r.am){amS+=parseInt(r.am.sys);amD+=parseInt(r.am.dia);amC++;let c=calcD(r.am);pp+=c.pp;map+=c.map;tc++;} if(r.pm){pmS+=parseInt(r.pm.sys);pmD+=parseInt(r.pm.dia);pmC++;let c=calcD(r.pm);pp+=c.pp;map+=c.map;tc++;}}} const f=(s,c)=>c>0?Math.round(s/c):'-'; return {am:`${f(amS,amC)} / ${f(amD,amC)}`,pm:`${f(pmS,pmC)} / ${f(pmD,pmC)}`,pp:f(pp,tc),map:f(map,tc)};};
+            const s7=getA(7), s30=getA(30);
+            ['7','30'].forEach(x=>{ document.getElementById("avg"+x+"Am").textContent=eval('s'+x).am; document.getElementById("avg"+x+"Pm").textContent=eval('s'+x).pm; document.getElementById("avg"+x+"Pp").innerHTML=formatBadge(eval('s'+x).pp,'pp'); document.getElementById("avg"+x+"Map").innerHTML=formatBadge(eval('s'+x).map,'map'); });
+            
+            // Asystent
+            const fD=[]; for(let i=0;i<30;i++){let r=records[formatDate(new Date(new Date().getTime()-(i*86400000)))]; if(r){if(r.am)fD.push({s:'am',...r.am}); if(r.pm)fD.push({s:'pm',...r.pm});}}
+            const iB=document.getElementById("insightsBox"); if(fD.length<5) iB.innerHTML=`<h4 style="margin:0 0 15px 0;font-size:14px;display:flex;align-items:center;gap:8px;"><svg style="width:18px;color:var(--primary);" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"></path></svg> ${t('insightsTitle')}</h4><div style="font-size:13px;color:var(--text-muted);">${t('insNeedMoreData')}</div>`;
+            else {
+                let as=0,ac=0,ps=0,pc=0,sp=0,sc=0,op=0,oc=0; fD.forEach(r=>{if(r.s==='am'){as+=r.sys;ac++;}else{ps+=r.sys;pc++;} if(r.pul){if(r.tags&&r.tags.includes('stress')){sp+=parseInt(r.pul);sc++;}else{op+=parseInt(r.pul);oc++;}}});
+                let aA=ac?as/ac:0, pA=pc?ps/pc:0, sA=sc?sp/sc:0, oA=oc?op/oc:0, ins=[];
+                if(aA>pA+5&&pA>0)ins.push("🌅 "+t('insMorningHigh').replace('{X}',Math.round(aA-pA))); else if(pA>aA+5&&aA>0)ins.push("🌃 "+t('insEveningHigh').replace('{X}',Math.round(pA-aA))); else ins.push("⚖️ "+t('insStableDiff'));
+                if(sc>=2&&sA>oA+5&&oA>0)ins.push("🌩️ "+t('insStressPulse').replace('{X}',Math.round(sA-oA)));
+                let strk=0, dts=Object.keys(records).sort((a,b)=>new Date(b)-new Date(a)); for(let d of dts){let am=records[d].am, pm=records[d].pm, n=true; if(am&&(am.sys>=130||am.dia>=85))n=false; if(pm&&(pm.sys>=130||pm.dia>=85))n=false; if(n&&(am||pm))strk++; else break;}
+                if(strk>=3)ins.push("🎉 "+t('insNormalStreak').replace('{X}',strk)); else if(strk===0)ins.push("⚠️ "+t('insWarning'));
+                let ih=`<h4 style="margin:0 0 15px 0;font-size:14px;display:flex;align-items:center;gap:8px;"><svg style="width:18px;color:var(--primary);" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"></path></svg> ${t('insightsTitle')}</h4>`;
+                ins.forEach(i=>ih+=`<div style="font-size:13px;color:var(--text-muted);margin-bottom:10px;line-height:1.5;padding:12px;background:var(--bg-input);border-radius:10px;border-left:3px solid var(--primary);">${i}</div>`); iB.innerHTML=ih;
+            } iB.style.display='block';
+
+            // Wykres
+            if(bpChartInstance) bpChartInstance.destroy();
+            const lbls=[], sD=[], dD=[], pD=[], gD=[]; rawChartRecords=[]; let hG=false;
+            Object.keys(records).sort().slice(-30).forEach(d=>{ const sd=d.substring(5); ['am','pm'].forEach(s=>{ if(records[d][s]){ let r=records[d][s]; lbls.push(`${sd} (${s.toUpperCase()})`); sD.push(r.sys); dD.push(r.dia); pD.push(r.pul||null); gD.push(r.gluc||null); rawChartRecords.push(r); if(r.gluc)hG=true; } }); });
+            document.getElementById('chartWrapper').style.minWidth=(lbls.length*45)+'px';
+            bpChartInstance=new Chart(document.getElementById('bpChart').getContext('2d'), getChartCfg(lbls,sD,dD,pD,gD,hG,false));
+            setTimeout(()=>{const s=document.getElementById("chartScroll"); if(s)s.scrollLeft=s.scrollWidth;},100);
+        }
+    }
+
+    function getChartCfg(lbls,sD,dD,pD,gD,hG,isPdf) {
+        let gSys=document.createElement('canvas').getContext('2d').createLinearGradient(0,0,0,isPdf?400:300); gSys.addColorStop(0,isPdf?'rgba(239,68,68,0.35)':(isLightMode?'rgba(239,68,68,0.25)':'rgba(239,68,68,0.35)')); gSys.addColorStop(1,'rgba(239,68,68,0)');
+        let gDia=document.createElement('canvas').getContext('2d').createLinearGradient(0,0,0,isPdf?400:300); gDia.addColorStop(0,isPdf?'rgba(59,130,246,0.35)':(isLightMode?'rgba(59,130,246,0.25)':'rgba(59,130,246,0.35)')); gDia.addColorStop(1,'rgba(59,130,246,0)');
+        const tc=isPdf?'#121212':(isLightMode?'#6b7280':'#9ca3af'), gc=isPdf?'#e5e7eb':(isLightMode?'#e5e7eb':'#2d3142'), pR=c=>c.raw>=140||c.raw<90?(isPdf?5:6):(isPdf?3:4), dR=c=>c.raw>=90||c.raw<60?(isPdf?5:6):(isPdf?3:4), pb=(c,t,h,l)=>c.raw>=h?'#ef4444':(c.raw<l?'#0ea5e9':t);
+        const ds=[
+            {label:'SYS',data:sD,borderColor:'#ef4444',backgroundColor:gSys,fill:true,tension:0.4,borderWidth:3,pointRadius:pR,pointBackgroundColor:c=>pb(c,(isPdf||isLightMode?'#ffffff':'#1e212b'),140,90),pointBorderColor:c=>pb(c,'#ef4444',140,90),pointBorderWidth:2,yAxisID:'y'},
+            {label:'DIA',data:dD,borderColor:'#3b82f6',backgroundColor:gDia,fill:true,tension:0.4,borderWidth:3,pointRadius:dR,pointBackgroundColor:c=>pb(c,(isPdf||isLightMode?'#ffffff':'#1e212b'),90,60),pointBorderColor:c=>pb(c,'#3b82f6',90,60),pointBorderWidth:2,yAxisID:'y'},
+            {label:t('tPul'),data:pD,borderColor:'#8b5cf6',backgroundColor:'#8b5cf6',borderDash:[5,5],tension:0.4,borderWidth:2,pointRadius:0,pointHitRadius:10,yAxisID:'y'}
+        ]; if(hG) ds.push({label:t('sGluc'),data:gD,borderColor:'#f59e0b',backgroundColor:'#f59e0b',borderDash:[2,2],tension:0.4,pointRadius:3,yAxisID:'y1'});
+        let sc={x:{ticks:{color:tc,font:isPdf?{size:11}:{}},grid:{color:gc}}, y:{type:'linear',display:true,position:'left',ticks:{color:tc,font:isPdf?{size:13}:{}},grid:{color:gc}}}; if(hG)sc.y1={type:'linear',display:true,position:'right',ticks:{color:'#f59e0b'},grid:{drawOnChartArea:false}};
+        let opts={responsive:!isPdf, maintainAspectRatio:false, color:tc, scales:sc, plugins:{legend:{labels:{color:tc,font:{family:"'Inter', sans-serif",size:isPdf?14:12}}}, annotation:{annotations:{boxOptimal:{type:'box',yMin:60,yMax:120,backgroundColor:isLightMode||isPdf?'rgba(16, 185, 129, 0.1)':'rgba(16, 185, 129, 0.08)',borderWidth:0}, lineSys:{type:'line',yMin:140,yMax:140,borderColor:'rgba(239, 68, 68, 0.5)',borderWidth:2,borderDash:[5,5]}, lineDia:{type:'line',yMin:90,yMax:90,borderColor:'rgba(59, 130, 246, 0.5)',borderWidth:2,borderDash:[5,5]}}}}};
+        if(isPdf) opts.animation=false; else { opts.interaction={mode:'index',intersect:false}; opts.plugins.tooltip={backgroundColor:isLightMode?'rgba(0,0,0,0.8)':'rgba(30,33,43,0.95)',titleFont:{size:13},bodyFont:{size:13},padding:12,cornerRadius:8, callbacks:{label:c=>{let l=c.dataset.label||'';if(l)l+=': ';if(c.parsed.y!==null){l+=c.parsed.y;if(c.datasetIndex<2)l+=' mmHg';else if(c.datasetIndex===2)l+=' BPM';}return l;}, afterBody:c=>{let r=rawChartRecords[c[0].dataIndex],ex=[]; if(r&&r.tags&&r.tags.length)ex.push(`\n${t('sTags').replace(':','')}: ${r.tags.map(tk=>t("tag"+tk.charAt(0).toUpperCase()+tk.slice(1))||tk).join(', ')}`); if(r&&r.note)ex.push(`${t('sNote').replace(':','')}: ${r.note}`); return ex;}}}; }
+        return {type:'line', data:{labels:lbls,datasets:ds}, options:opts};
+    }
+
+    function renderFormTags() {
+        const dT=['coffee','stress','headache','work','pills'], sT=JSON.parse(localStorage.getItem('bpCustomTags_'+currentProfile))||[], c=document.getElementById("tagsContainer"); c.innerHTML="";
+        [...dT,...sT].forEach(tk=>{ const b=document.createElement("button"); b.className="tag-btn"; b.dataset.tag=tk; b.innerHTML=`<span>${t("tag"+tk.charAt(0).toUpperCase()+tk.slice(1))||tk}</span>`; if(currentTags.includes(tk))b.classList.add('selected'); b.onclick=()=>{if(currentTags.includes(tk)){currentTags=currentTags.filter(t=>t!==tk);b.classList.remove('selected');}else{currentTags.push(tk);b.classList.add('selected');}}; c.appendChild(b); });
+        const a=document.createElement("button"); a.className="tag-btn tag-btn-add"; a.innerHTML=`+ ${t('addCustomTag')}`; a.onclick=()=>{showPrompt(t('addCustomTag'),t('promptNewTag'),"",nT=>{if(nT&&!dT.includes(nT)&&!sT.includes(nT)){sT.push(nT);localStorage.setItem('bpCustomTags_'+currentProfile,JSON.stringify(sT));currentTags.push(nT);renderFormTags();}});}; c.appendChild(a);
+    }
+
+    function openModal(dk, s=null) { selectedDateStr=dk; document.getElementById("selectedDate").textContent=dk; if(s)document.getElementById("timeSlot").value=s; else{const n=new Date(); document.getElementById("timeSlot").value=(dk===formatDate(n)&&n.getHours()>=16)?"pm":"am";} loadFormData(); showModalWithAnim("modal"); }
+    function loadFormData() {
+        const s=document.getElementById("timeSlot").value, d=records[selectedDateStr]?.[s]; document.getElementById("btnDeleteMeas").style.display=d?"flex":"none";
+        const fD=d||{sys:'',dia:'',pul:'',gluc:'',weight:'',arm:'left',pos:'sit',time:s==='am'?'08:00':'20:00',tags:[],note:''};
+        ['sys','dia','pul','gluc','weight','arm','pos','time','note'].forEach(k=>document.getElementById(k+"Val").value=fD[k]||(k==='arm'?'left':(k==='pos'?'sit':'')));
+        currentTags=fD.tags||[]; renderFormTags();
+    }
+    
+    function deleteMeas() { showConfirm(t('msgDelTitle'),t('msgDelMeasText'),t('btnDelConfirm'),()=>{const s=document.getElementById("timeSlot").value; if(records[selectedDateStr]&&records[selectedDateStr][s]){delete records[selectedDateStr][s]; if(!Object.keys(records[selectedDateStr]).length)delete records[selectedDateStr]; localStorage.setItem(getStorageKey(),JSON.stringify(records)); hideModalWithAnim("modal"); renderUI(); showToast(t('msgMeasDeleted'),1);} }); }
+    function saveMeas() {
+        const s=document.getElementById("timeSlot").value, sys=parseInt(document.getElementById("sysVal").value), dia=parseInt(document.getElementById("diaVal").value); if(!sys||!dia){showToast(t('msgErrVal'));return;}
+        if(!records[selectedDateStr])records[selectedDateStr]={}; records[selectedDateStr][s]={sys,dia,pul:document.getElementById("pulVal").value||0,gluc:document.getElementById("glucVal").value||'',weight:document.getElementById("weightVal").value||'',arm:document.getElementById("armVal").value,pos:document.getElementById("posVal").value,time:document.getElementById("timeVal").value,tags:[...currentTags],note:document.getElementById("noteVal").value};
+        localStorage.setItem(getStorageKey(),JSON.stringify(records)); hideModalWithAnim("modal"); renderUI(); if(sys>=180||dia>=110)showHealthAlert(); else showToast(t('msgSaved'),1);
+    }
+
+    function exportPdf() {
+        toggleMenu(false); showToast(t('pdfGenMsg'),true);
+        setTimeout(() => {
+            const sd=Object.keys(records).sort((a,b)=>new Date(b)-new Date(a)); if(!sd.length)return;
+            const lbls=[],sD=[],dD=[],pD=[],gD=[]; let hG=false;
+            sd.slice(0,30).reverse().forEach(d=>{const x=d.substring(5);['am','pm'].forEach(s=>{if(records[d][s]){let r=records[d][s];lbls.push(`${x} (${s.toUpperCase()})`);sD.push(r.sys);dD.push(r.dia);pD.push(r.pul||null);gD.push(r.gluc||null);if(r.gluc)hG=true;}});});
+            if(!lbls.length){ buildPdf(sd,null); return; }
+            const tc=document.createElement('canvas'); tc.width=1000; tc.height=400; tc.style.cssText='position:absolute;top:-9999px;visibility:hidden;'; document.body.appendChild(tc);
+            const tmp=new Chart(tc.getContext('2d'), getChartCfg(lbls,sD,dD,pD,gD,hG,true));
+            setTimeout(()=>{ const img=tmp.toBase64Image(); document.body.removeChild(tc); tmp.destroy(); buildPdf(sd,img); }, 500);
+        }, 200);
+    }
+
+    function buildPdf(sd, img) {
+        let h=`<div class="print-title">${t('pdfTitle')}</div><div class="print-subtitle">${t('pdfSub')} <br><br><b>${t('pdfPatient')} ${currentProfile}</b> | ${t('pdfGen')} ${new Date().toLocaleDateString(currentLang==='pl'?'pl-PL':'en-GB')}</div>`;
+        if(img) h+=`<h4 style="margin-top:20px;text-align:center;">${t('pdfChart')}</h4><div style="text-align:center;margin-bottom:30px;"><img src="${img}" style="max-width:100%;height:auto;max-height:250px;object-fit:contain;"></div>`;
+        let wm={}; sd.forEach(d=>{ let dt=new Date(d), st=getStartOfWeek(dt), ed=new Date(st); ed.setDate(st.getDate()+6); let wk=formatDate(st);
+            if(!wm[wk]) wm[wk]={l:`${String(st.getDate()).padStart(2,'0')}.${String(st.getMonth()+1).padStart(2,'0')}.${st.getFullYear()} - ${String(ed.getDate()).padStart(2,'0')}.${String(ed.getMonth()+1).padStart(2,'0')}.${ed.getFullYear()}`,dts:[],s:{sS:0,dS:0,pS:0,sC:0,pC:0}}; wm[wk].dts.push(d);
+            ['am','pm'].forEach(s=>{if(records[d][s]){let r=records[d][s]; if(r.sys&&r.dia){wm[wk].s.sS+=parseInt(r.sys);wm[wk].s.dS+=parseInt(r.dia);wm[wk].s.sC++;} if(r.pul){wm[wk].s.pS+=parseInt(r.pul);wm[wk].s.pC++;}}}); });
+        Object.keys(wm).sort((a,b)=>new Date(b)-new Date(a)).forEach(wk=>{ let w=wm[wk], aS=w.s.sC?Math.round(w.s.sS/w.s.sC):'-', aD=w.s.sC?Math.round(w.s.dS/w.s.sC):'-', aP=w.s.pC?Math.round(w.s.pS/w.s.pC):'-', pp=(aS!=='-'&&aD!=='-')?(aS-aD):'-', map=(aD!=='-'&&pp!=='-')?Math.round(aD+(pp/3)):'-', c='';
+            if(aS!=='-'){if(aS>=180||aD>=110)c=t('catSevere');else if(aS>=160||aD>=100)c=t('catModerate');else if(aS>=140||aD>=90)c=t('catMild');else if(aS>=130||aD>=85)c=t('catHighNormal');else if(aS<90||aD<60)c=t('catLow');else c=t('catNormal');}
+            h+=`<div style="page-break-inside:avoid;margin-bottom:20px;"><h4 style="margin:15px 0 5px 0;border-bottom:1px solid #ccc;padding-bottom:5px;">${t('pdfWeek')} ${w.l}</h4><div style="font-size:12px;margin-bottom:10px;color:#444;"><b>${t('pdfWeekAvg')}</b> ${aS}/${aD} mmHg ${c?`<span style="text-transform:uppercase;font-weight:800;font-size:11px;margin:0 4px;">[${c}]</span>`:''} (PP: ${pp}, MAP: ${map}) | ${t('tPul')}: ${aP} BPM</div><table class="print-table" style="margin-bottom:10px;"><thead><tr><th>${t('tDate')}</th><th>${t('tTime')}</th><th>${t('tBp')}</th><th>${t('tPul')}</th><th>${t('tExtra')}</th></tr></thead><tbody>`;
+            w.dts.forEach(dt=>{ ['am','pm'].forEach(s=>{ if(records[dt][s]){ let r=records[dt][s], cD=calcD(r), x=[], cl=[]; x.push(`<b>${t('pp')}:</b> ${cD.pp}, <b>${t('map')}:</b> ${cD.map}`); if(r.arm)cl.push(r.arm==='left'?t('armLeft'):t('armRight')); if(r.pos)cl.push(r.pos==='sit'?t('posSit'):(r.pos==='lie'?t('posLie'):t('posStand'))); if(cl.length)x.push(`<b>${t('tPos')}:</b> ${cl.join(', ')}`); if(r.gluc)x.push(`<b>${t('sGluc')}:</b> ${r.gluc} mg/dL`); if(r.weight)x.push(`<b>${t('sWeight')}:</b> ${r.weight} kg`); if(r.tags&&r.tags.length)x.push(`<b>${t('sTags')}:</b> ${r.tags.map(tk=>t("tag"+tk.charAt(0).toUpperCase()+tk.slice(1))||tk).join(', ')}`); if(r.note)x.push(`<b>${t('sNote')}:</b> ${r.note}`);
+            h+=`<tr><td>${dt}<br><small>${s==='am'?t('morning'):t('evening')}</small></td><td>${r.time}</td><td class="print-sysdia">${r.sys} / ${r.dia}</td><td>${r.pul||'-'}</td><td class="print-notes">${x.join('<br>')}</td></tr>`; } }); }); h+=`</tbody></table></div>`;
+        }); document.getElementById("printArea").innerHTML=h; setTimeout(()=>window.print(),500);
+    }
+
+    let notifOn = localStorage.getItem("bpNotifications") === "true";
+    function updateNotifyBtn() { const b=document.getElementById("btnToggleNotifications"); if(notifOn){b.innerHTML=`<svg viewBox="0 0 24 24" style="width:18px;stroke:currentColor;fill:none;stroke-width:2;margin-right:8px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg><span data-i18n="btnNotifOff">${t('btnNotifOff')}</span>`;b.classList.add("btn-danger");}else{b.innerHTML=`<svg viewBox="0 0 24 24" style="width:18px;stroke:currentColor;fill:none;stroke-width:2;margin-right:8px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span data-i18n="btnNotifOn">${t('btnNotifOn')}</span>`;b.classList.remove("btn-danger");} }
+    function toggleNotify() { if(!notifOn){if("Notification" in window){Notification.requestPermission().then(p=>{if(p==="granted"){notifOn=true;localStorage.setItem("bpNotifications","true");updateNotifyBtn();showToast(t('notifGranted'),1);}else showToast(t('notifDenied'));});}else showToast(t('notifNoSupport'));}else{notifOn=false;localStorage.setItem("bpNotifications","false");updateNotifyBtn();showToast(t('notifOff'));} }
+
+    setInterval(() => { if(!notifOn||Notification.permission!=="granted")return; const n=new Date(), h=n.getHours(), m=n.getMinutes(); if((h===8||h===20)&&m===0){const k=formatDate(n)+"-"+h; if(localStorage.getItem("lastBpNotif")!==k){new Notification("CardioLog",{body:t('notifBody'),icon:"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>❤️</text></svg>"});localStorage.setItem("lastBpNotif",k);}} }, 60000);
+
+    applyLanguage(); loadProfileData();
+</script>
+</body>
+</html>

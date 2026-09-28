@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.logiccraftstudio.cardiolog",
+        "sha256_cert_fingerprints": ["DE:9E:FE:AB:09:F1:5A:5B:72:CF:0A:83:C1:0F:09:E5:17:40:66:CE:D1:84:44:58:EC:C8:AA:64:4A:3B:C3:84"]
+      }
+    }]

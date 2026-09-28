@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CardioLog</title>
+    <!-- Konfiguracja PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f111a">
+<!-- Wsparcie dla urządzeń Apple (iOS) -->
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CardioLog">
 <!-- Skrypty wykresów i adnotacji -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
@@ -856,6 +864,16 @@
     setInterval(() => { if(!notifOn||Notification.permission!=="granted")return; const n=new Date(), h=n.getHours(), m=n.getMinutes(); if((h===8||h===20)&&m===0){const k=formatDate(n)+"-"+h; if(localStorage.getItem("lastBpNotif")!==k){new Notification("CardioLog",{body:t('notifBody'),icon:"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>❤️</text></svg>"});localStorage.setItem("lastBpNotif",k);}} }, 60000);
 
     applyLanguage(); loadProfileData();
+</script>
+    <!-- Rejestracja Service Workera dla PWA -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('PWA: Service Worker aktywny!'))
+        .catch(err => console.log('PWA: Błąd rejestracji', err));
+    });
+  }
 </script>
 </body>
 </html>

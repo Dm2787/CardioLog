@@ -251,7 +251,7 @@
 <!-- PASEK PROFILI -->
 <div class="profile-bar">
     <div class="profile-selector" onclick="toggleProfileMenu()">
-        <span id="currentProfileLabel">Profil: Damian</span>
+        <span id="currentProfileLabel"></span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
     </div>
     <div class="profile-menu" id="profileMenu"></div>
@@ -551,6 +551,7 @@
     const translations = {
         pl: {
             menuTitle: "Ustawienia", themeDark: "🌙 Ciemny", themeLight: "☀️ Jasny",
+            addUserLabel: "Dodaj użytkownika", reqAddUser: "Najpierw dodaj profil użytkownika!", msgNoProfile: "Brak profilu",
             profPrefix: "Profil: ", addProfBtn: "+ Dodaj nową osobę",
             tabMonth: "Miesiąc", tabWeek: "Tydzień", tabChart: "Wykres",
             months: ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"],
@@ -597,6 +598,7 @@
         },
         en: {
             menuTitle: "Settings", themeDark: "🌙 Dark", themeLight: "☀️ Light",
+            addUserLabel: "Add user", reqAddUser: "Please add a user profile first!", msgNoProfile: "No profile",
             profPrefix: "Profile: ", addProfBtn: "+ Add new person",
             tabMonth: "Month", tabWeek: "Week", tabChart: "Chart",
             months: ["January","February","March","April","May","June","July","August","September","October","November","December"],
@@ -643,10 +645,10 @@
         }
     };
 
-    let currentLang = localStorage.getItem('bpLang') || 'pl';
+    let currentLang = localStorage.getItem('bpLang') || (navigator.language.startsWith('pl') ? 'pl' : 'en');
     let isLightMode = localStorage.getItem("bpTheme") === "light";
-    let profiles = JSON.parse(localStorage.getItem('bpProfilesList')) || ['Damian'];
-    let currentProfile = localStorage.getItem('bpCurrentProfile') || profiles[0];
+    let profiles = JSON.parse(localStorage.getItem('bpProfilesList')) || [];
+    let currentProfile = localStorage.getItem('bpCurrentProfile') || (profiles.length > 0 ? profiles[0] : null);
     let records = {}, currentMode = 'month', displayDate = new Date(), bpChartInstance = null, currentTags = [], rawChartRecords = [], selectedDateStr = "";
 
     function t(key) { return translations[currentLang][key] || key; }
@@ -680,32 +682,72 @@
         if(show) { o.style.display="block"; setTimeout(()=>{ o.style.opacity="1"; m.classList.add("open"); }, 10); } 
         else { o.style.opacity="0"; m.classList.remove("open"); setTimeout(()=>{ o.style.display="none"; }, 300); }
     }
-    function toggleProfileMenu() { document.getElementById("profileMenu").classList.toggle("open"); }
+    
+    function triggerAddProfile() {
+        showPrompt(t('msgProfAddTitle'), t('msgProfAddText'), "", (newName) => { 
+            if (!profiles.includes(newName)) { 
+                profiles.push(newName); 
+                localStorage.setItem('bpProfilesList', JSON.stringify(profiles)); 
+                currentProfile = newName; 
+                localStorage.setItem('bpCurrentProfile', currentProfile); 
+                renderProfileMenu(); 
+                loadProfileData(); 
+                showToast(t('msgProfAdded'), true); 
+            } else showToast(t('msgProfExists')); 
+        });
+    }
+
+    function toggleProfileMenu() { 
+        if (profiles.length === 0) {
+            triggerAddProfile();
+        } else {
+            document.getElementById("profileMenu").classList.toggle("open"); 
+        }
+    }
 
     function getStorageKey() { return "bpApp_" + currentProfile; }
     
     function loadProfileData() {
+        if (!currentProfile) {
+            records = {};
+            document.getElementById("profileHeightVal").value = '';
+            renderUI();
+            return;
+        }
         if(!localStorage.getItem(getStorageKey()) && localStorage.getItem("bpDiaryAppPro_V2")) localStorage.setItem(getStorageKey(), localStorage.getItem("bpDiaryAppPro_V2"));
         records = JSON.parse(localStorage.getItem(getStorageKey())) || {};
         let savedHeight = localStorage.getItem("bpHeight_" + currentProfile);
-        if(!savedHeight && currentProfile === 'Damian') { savedHeight = '193'; localStorage.setItem("bpHeight_" + currentProfile, savedHeight); }
         document.getElementById("profileHeightVal").value = savedHeight || '';
         renderUI();
     }
 
-    function saveHeight() { localStorage.setItem("bpHeight_" + currentProfile, document.getElementById("profileHeightVal").value); showToast(t('msgHeightSaved'), true); renderUI(); }
+    function saveHeight() { 
+        if (!currentProfile) { showToast(t('reqAddUser')); return; }
+        localStorage.setItem("bpHeight_" + currentProfile, document.getElementById("profileHeightVal").value); 
+        showToast(t('msgHeightSaved'), true); renderUI(); 
+    }
 
     function renderProfileMenu() {
-        const pm = document.getElementById("profileMenu"); pm.innerHTML = ""; document.getElementById("currentProfileLabel").textContent = t('profPrefix') + currentProfile;
-        profiles.forEach(p => {
-            const item = document.createElement("div"); item.className = "profile-item" + (p === currentProfile ? " active-profile" : "");
-            item.innerHTML = `<span>${p}</span>` + (p === currentProfile ? `<span style="font-size:12px;">✔️</span>` : "");
-            item.onclick = (e) => { e.stopPropagation(); currentProfile = p; localStorage.setItem('bpCurrentProfile', currentProfile); toggleProfileMenu(); renderProfileMenu(); loadProfileData(); showToast(t('msgProfChanged') + " " + currentProfile, true); };
-            pm.appendChild(item);
-        });
-        const addBtn = document.createElement("div"); addBtn.className = "profile-item profile-add-btn"; addBtn.textContent = t('addProfBtn');
-        addBtn.onclick = (e) => { e.stopPropagation(); toggleProfileMenu(); showPrompt(t('msgProfAddTitle'), t('msgProfAddText'), "", (newName) => { if (!profiles.includes(newName)) { profiles.push(newName); localStorage.setItem('bpProfilesList', JSON.stringify(profiles)); currentProfile = newName; localStorage.setItem('bpCurrentProfile', currentProfile); renderProfileMenu(); loadProfileData(); showToast(t('msgProfAdded'), true); } else showToast(t('msgProfExists')); }); };
-        pm.appendChild(addBtn);
+        const pm = document.getElementById("profileMenu"); pm.innerHTML = ""; 
+        const lbl = document.getElementById("currentProfileLabel");
+        
+        if (profiles.length === 0) {
+            lbl.textContent = t('addUserLabel');
+            lbl.style.color = "var(--primary)";
+        } else {
+            lbl.textContent = t('profPrefix') + currentProfile;
+            lbl.style.color = "var(--text-main)";
+            
+            profiles.forEach(p => {
+                const item = document.createElement("div"); item.className = "profile-item" + (p === currentProfile ? " active-profile" : "");
+                item.innerHTML = `<span>${p}</span>` + (p === currentProfile ? `<span style="font-size:12px;">✔️</span>` : "");
+                item.onclick = (e) => { e.stopPropagation(); currentProfile = p; localStorage.setItem('bpCurrentProfile', currentProfile); toggleProfileMenu(); renderProfileMenu(); loadProfileData(); showToast(t('msgProfChanged') + " " + currentProfile, true); };
+                pm.appendChild(item);
+            });
+            const addBtn = document.createElement("div"); addBtn.className = "profile-item profile-add-btn"; addBtn.textContent = t('addProfBtn');
+            addBtn.onclick = (e) => { e.stopPropagation(); toggleProfileMenu(); triggerAddProfile(); };
+            pm.appendChild(addBtn);
+        }
     }
 
     function showModalWithAnim(id) { document.getElementById(id).style.display = "flex"; setTimeout(() => document.getElementById(id).classList.add("show"), 10); }
@@ -716,16 +758,35 @@
     function showHealthAlert() { document.getElementById("alertText").innerHTML = t('alertText'); showModalWithAnim("healthAlertModal"); }
 
     function actionProfile(act) {
+        if (!currentProfile) { showToast(t('reqAddUser')); return; }
         toggleMenu(false);
         setTimeout(() => {
             if(act === 'rename') showPrompt(t('msgRenameTitle'), t('msgRenameText'), currentProfile, (n) => { if(n === currentProfile) return; if(profiles.includes(n)) { showToast(t('msgProfExists')); return; } const oKey = getStorageKey(), d = localStorage.getItem(oKey), h = localStorage.getItem("bpHeight_" + currentProfile), idx = profiles.indexOf(currentProfile); profiles[idx] = n; localStorage.setItem('bpProfilesList', JSON.stringify(profiles)); currentProfile = n; localStorage.setItem('bpCurrentProfile', n); if(d){localStorage.setItem(getStorageKey(), d); localStorage.removeItem(oKey);} if(h){localStorage.setItem("bpHeight_" + n, h); localStorage.removeItem("bpHeight_" + profiles[idx]);} renderProfileMenu(); showToast(t('msgRenameDone'), true); });
-            if(act === 'delete') { if (profiles.length <= 1) { showToast(t('msgDelErr')); return; } showConfirm(t('msgDelTitle'), `${t('msgDelText1')} "${currentProfile}" ${t('msgDelText2')}`, t('btnDelConfirm'), () => { localStorage.removeItem(getStorageKey()); localStorage.removeItem("bpHeight_" + currentProfile); profiles = profiles.filter(p => p !== currentProfile); localStorage.setItem('bpProfilesList', JSON.stringify(profiles)); currentProfile = profiles[0]; localStorage.setItem('bpCurrentProfile', currentProfile); renderProfileMenu(); loadProfileData(); showToast(t('msgDelDone'), true); }); }
+            if(act === 'delete') { 
+                showConfirm(t('msgDelTitle'), `${t('msgDelText1')} "${currentProfile}" ${t('msgDelText2')}`, t('btnDelConfirm'), () => { 
+                    localStorage.removeItem(getStorageKey()); 
+                    localStorage.removeItem("bpHeight_" + currentProfile); 
+                    profiles = profiles.filter(p => p !== currentProfile); 
+                    localStorage.setItem('bpProfilesList', JSON.stringify(profiles)); 
+                    
+                    if (profiles.length > 0) {
+                        currentProfile = profiles[0]; 
+                        localStorage.setItem('bpCurrentProfile', currentProfile); 
+                    } else {
+                        currentProfile = null;
+                        localStorage.removeItem('bpCurrentProfile');
+                    }
+                    renderProfileMenu(); 
+                    loadProfileData(); 
+                    showToast(t('msgDelDone'), true); 
+                }); 
+            }
             if(act === 'clear') showConfirm(t('msgClearTitle'), `${t('msgClearText')} ${currentProfile}?`, t('btnClearConfirm'), () => { records = {}; localStorage.setItem(getStorageKey(), JSON.stringify(records)); renderUI(); showToast(t('msgClearDone'), true); });
         }, 350);
     }
 
     function exportData() { const exp = {}; for(let i=0; i<localStorage.length; i++){ const k=localStorage.key(i); if(k.startsWith("bp")) exp[k]=localStorage.getItem(k); } const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(exp)], {type:"application/json"})); a.download = `CardioLog_Backup_${formatDate(new Date())}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); toggleMenu(false); showToast(t('msgExported'), true); }
-    function importData(e) { const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); let v = 0; for(const k in d) { if(k.startsWith("bp")) { localStorage.setItem(k, d[k]); v++; } } if(v > 0) { profiles = JSON.parse(localStorage.getItem('bpProfilesList')) || ['Damian']; currentProfile = localStorage.getItem('bpCurrentProfile') || profiles[0]; renderProfileMenu(); loadProfileData(); toggleMenu(false); showToast(t('msgImported'), true); } else showToast(t('msgImportErr')); } catch(err) { showToast(t('msgImportErr')); } document.getElementById("importFileInput").value = ""; }; r.readAsText(f); }
+    function importData(e) { const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); let v = 0; for(const k in d) { if(k.startsWith("bp")) { localStorage.setItem(k, d[k]); v++; } } if(v > 0) { profiles = JSON.parse(localStorage.getItem('bpProfilesList')) || []; currentProfile = localStorage.getItem('bpCurrentProfile') || (profiles.length > 0 ? profiles[0] : null); renderProfileMenu(); loadProfileData(); toggleMenu(false); showToast(t('msgImported'), true); } else showToast(t('msgImportErr')); } catch(err) { showToast(t('msgImportErr')); } document.getElementById("importFileInput").value = ""; }; r.readAsText(f); }
 
     function switchMode(m) { currentMode = m; ["btnMonth", "btnWeek", "btnChart"].forEach(id => document.getElementById(id).classList.toggle("active", id === "btn" + m.charAt(0).toUpperCase() + m.slice(1))); const c = document.getElementById("viewContainer"); c.classList.remove("fade-in"); void c.offsetWidth; c.classList.add("fade-in"); renderUI(); }
     function navDate(dir) { if (currentMode === 'month') displayDate.setMonth(displayDate.getMonth() + dir); else if (currentMode === 'week') displayDate.setDate(displayDate.getDate() + (dir * 7)); const c = document.getElementById("viewContainer"); c.classList.remove("fade-in"); void c.offsetWidth; c.classList.add("fade-in"); renderUI(); }
@@ -815,7 +876,11 @@
         const a=document.createElement("button"); a.className="tag-btn tag-btn-add"; a.innerHTML=`+ ${t('addCustomTag')}`; a.onclick=()=>{showPrompt(t('addCustomTag'),t('promptNewTag'),"",nT=>{if(nT&&!dT.includes(nT)&&!sT.includes(nT)){sT.push(nT);localStorage.setItem('bpCustomTags_'+currentProfile,JSON.stringify(sT));currentTags.push(nT);renderFormTags();}});}; c.appendChild(a);
     }
 
-    function openModal(dk, s=null) { selectedDateStr=dk; document.getElementById("selectedDate").textContent=dk; if(s)document.getElementById("timeSlot").value=s; else{const n=new Date(); document.getElementById("timeSlot").value=(dk===formatDate(n)&&n.getHours()>=16)?"pm":"am";} loadFormData(); showModalWithAnim("modal"); }
+    function openModal(dk, s=null) { 
+        if (!currentProfile) { showToast(t('reqAddUser')); return; }
+        selectedDateStr=dk; document.getElementById("selectedDate").textContent=dk; if(s)document.getElementById("timeSlot").value=s; else{const n=new Date(); document.getElementById("timeSlot").value=(dk===formatDate(n)&&n.getHours()>=16)?"pm":"am";} loadFormData(); showModalWithAnim("modal"); 
+    }
+    
     function loadFormData() {
         const s=document.getElementById("timeSlot").value, d=records[selectedDateStr]?.[s]; document.getElementById("btnDeleteMeas").style.display=d?"flex":"none";
         const fD=d||{sys:'',dia:'',pul:'',gluc:'',weight:'',arm:'left',pos:'sit',time:s==='am'?'08:00':'20:00',tags:[],note:''};
@@ -831,6 +896,7 @@
     }
 
     function exportPdf() {
+        if (!currentProfile) { showToast(t('reqAddUser')); return; }
         toggleMenu(false); showToast(t('pdfGenMsg'),true);
         setTimeout(() => {
             const sd=Object.keys(records).sort((a,b)=>new Date(b)-new Date(a)); if(!sd.length)return;
